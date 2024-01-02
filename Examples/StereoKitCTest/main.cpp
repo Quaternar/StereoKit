@@ -24,6 +24,8 @@ using namespace sk;
 #include <string>
 #include <list>
 
+#include <lib/include/openxr/openxr.h>
+
 solid_t     floor_solid;
 matrix      floor_tr;
 material_t  floor_mat;
@@ -86,7 +88,7 @@ scene_t demos[] = {
 		demo_bvh_update,
 		demo_bvh_shutdown,
 	}, {
-		"Aliasing",
+		"Reprojection",
 		demo_aliasing_init,
 		demo_aliasing_update,
 		demo_aliasing_shutdown,
@@ -150,6 +152,8 @@ int __stdcall wWinMain(void*, void*, wchar_t*, int) {
 	log_subscribe(on_log);
 	log_set_filter(log_diagnostic);
 
+	backend_openxr_ext_request("XR_MSFT_composition_layer_reprojection");
+
 	sk_settings_t settings = {};
 	settings.app_name           = "StereoKit C";
 	settings.assets_folder      = "Assets";
@@ -160,6 +164,18 @@ int __stdcall wWinMain(void*, void*, wchar_t*, int) {
 	common_init();
 
 	scene_set_active(demos[1]);
+
+	PFN_xrEnumerateReprojectionModesMSFT xrEnumerateReprojectionModesMSFT = (PFN_xrEnumerateReprojectionModesMSFT)backend_openxr_get_function("xrEnumerateReprojectionModesMSFT");
+
+	const XrInstance xrInstance = (XrInstance)backend_openxr_get_instance();
+	const XrSystemId xrSystemId = (XrSystemId)backend_openxr_get_system_id();
+	const XrViewConfigurationType viewConfigurationType = XrViewConfigurationType::XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+	const uint32_t modeCapacityInput = 0;
+	uint32_t modeCountOutput = 0;
+	XrResult result = xrEnumerateReprojectionModesMSFT(xrInstance, xrSystemId, viewConfigurationType, modeCapacityInput, &modeCountOutput, nullptr);
+
+	XrReprojectionModeMSFT modes[4]{};
+	result = xrEnumerateReprojectionModesMSFT(xrInstance, xrSystemId, viewConfigurationType, modeCountOutput, &modeCountOutput, modes);
 
 	sk_run(common_update, common_shutdown);
 
