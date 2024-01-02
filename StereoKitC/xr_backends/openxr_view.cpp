@@ -19,6 +19,8 @@
 #include "../libraries/sk_gpu.h"
 
 #include <stdio.h>
+#include <thread>
+#include <random>
 
 namespace sk {
 
@@ -643,6 +645,10 @@ bool openxr_preferred_blend(XrViewConfigurationType view_type, display_blend_ pr
 
 ///////////////////////////////////////////
 
+std::random_device rd;
+std::mt19937 generator(rd());
+std::uniform_real_distribution<> distribution(0.5, 1.0);
+
 bool openxr_render_frame() {
 	// Block until the previous frame is finished displaying, and is ready for
 	// another one. Also returns a prediction of when the next frame will be
@@ -745,6 +751,13 @@ bool openxr_render_frame() {
 	end_info.layerCount           = (uint32_t)composition_layers->count;
 	end_info.layers               = composition_layers->data;
 	xr_chain_insert_extensions((XrBaseHeader*)&end_info, xr_end_frame_chain_bytes, xr_end_frame_chain_offset);
+
+	using namespace std::chrono_literals;
+
+	const float jitter = distribution(generator);
+	const float fps = 15 /** jitter*/;
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000 / fps)));
 
 	xr_check(xrEndFrame(xr_session, &end_info),
 		"xrEndFrame [%s]");

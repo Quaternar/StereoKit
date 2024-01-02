@@ -1,6 +1,8 @@
 ﻿#include <stereokit.h>
 #include <stereokit_ui.h>
 #include <vector>
+#include <thread>
+#include <chrono>
 using namespace sk;
 
 #include "scene.h"
@@ -213,6 +215,12 @@ void common_init() {
 }
 
 void common_update() {
+	/*using namespace std::chrono_literals;
+
+	const float fps = 10;
+
+	std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(1000 / fps)));*/
+
 	static app_focus_ prev_focus = app_focus_hidden;
 	app_focus_        curr_focus = sk_app_focus();
 	if (curr_focus == app_focus_active && prev_focus != app_focus_active) {
