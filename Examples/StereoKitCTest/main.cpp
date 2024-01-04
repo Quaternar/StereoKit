@@ -114,6 +114,7 @@ scene_t demos[] = {
 
 
 pose_t demo_select_pose;
+pose_t plane_pose;
 
 void on_log(log_, const char*);
 void log_window();
@@ -201,6 +202,8 @@ void common_init() {
 	demo_select_pose.position = vec3{0, 0, -0.4f};
 	demo_select_pose.orientation = quat_lookat(vec3_forward, vec3_zero);
 
+	plane_pose.position = vec3{1, 0, 1};
+
 		// Log some system info
 	const char* text = "";
 	log_infof("Device:   %s", device_get_name());
@@ -234,31 +237,21 @@ void common_update() {
 		prev_focus = curr_focus;
 	}
 
-	scene_update();
+	//scene_update();
 
 	// Render floor
 	if (sk_system_info().display_type == display_opaque)
 		render_add_model(floor_model, floor_tr);
 
-	ui_window_begin("Demos", demo_select_pose, vec2{50*cm2m, 0*cm2m});
-	for (int i = 0; i < sizeof(demos) / sizeof(scene_t); i++) {
-		std::string &name = demos[i].name;
-
-		ui_sameline();
-
-		if (ui_button(name.c_str())) {
-			log_write(log_inform, name.c_str());
-			scene_set_active(demos[i]);
-		}
-	}
-#if !defined(__EMSCRIPTEN__)
-	ui_hseparator();
-	if (ui_button("Exit") || (input_key(key_esc) & button_state_just_active)) sk_quit();
-#endif
+	ui_window_begin("PLANE", plane_pose, vec2{ 50 * cm2m, 0 * cm2m });
+	vec2 dimensions{ 20, 20 };
+	vec3 normal{ 1, 0, 0 };
+	vec3 top_direction{ 0, 1, 0 };
+	mesh_t mesh = mesh_gen_plane(dimensions, normal, top_direction);
+	material_t material = material_find(default_id_material_unlit);
+	material_set_cull(material, cull_none);
+	mesh_draw(mesh, material, matrix_identity);
 	ui_window_end();
-
-	ruler_window();
-	log_window();
 }
 
 void common_shutdown() {
