@@ -243,8 +243,8 @@
       "cacheVariables": {
         "CMAKE_SYSTEM_NAME":    "Android",
         "CMAKE_ANDROID_NDK":    "$env{NDK}",
-        "ANDROID_PLATFORM":     "android-32",
-        "CMAKE_SYSTEM_VERSION": "32",
+        "ANDROID_PLATFORM":     "android-31",
+        "CMAKE_SYSTEM_VERSION": "31",
         "DYNAMIC_LOADER":       "ON",
         "SK_DYNAMIC_OPENXR":    "ON"
       }
