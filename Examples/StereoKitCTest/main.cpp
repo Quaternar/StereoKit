@@ -18,11 +18,13 @@ using namespace sk;
 #include "demo_desktop.h"
 #include "demo_bvh.h"
 #include "demo_aliasing.h"
+#include <lib/include/openxr/openxr.h>
 
 #include <stdio.h>
 
 #include <string>
 #include <list>
+#include <unordered_map>
 
 solid_t     floor_solid;
 matrix      floor_tr;
@@ -150,6 +152,8 @@ int __stdcall wWinMain(void*, void*, wchar_t*, int) {
 	log_subscribe(on_log);
 	log_set_filter(log_diagnostic);
 
+	backend_openxr_ext_request("XR_ML_marker_understanding");
+
 	sk_settings_t settings = {};
 	settings.app_name           = "StereoKit C";
 	settings.assets_folder      = "Assets";
@@ -165,6 +169,14 @@ int __stdcall wWinMain(void*, void*, wchar_t*, int) {
 
 	return 0;
 }
+
+XrMarkerDetectorML markerDetector = XR_NULL_HANDLE;
+PFN_xrSnapshotMarkerDetectorML xrSnapshotMarkerDetectorML;
+PFN_xrGetMarkerDetectorStateML xrGetMarkerDetectorStateML;
+PFN_xrGetMarkersML xrGetMarkersML;
+PFN_xrCreateMarkerSpaceML xrCreateMarkerSpaceML;
+PFN_xrGetMarkerStringML xrGetMarkerStringML;
+PFN_xrGetMarkerNumberML xrGetMarkerNumberML;
 
 void common_init() {
 	// Create a PBR floor material
@@ -194,7 +206,26 @@ void common_init() {
 
 	demo_select_pose.position = vec3{0, 0, -0.4f};
 	demo_select_pose.orientation = quat_lookat(vec3_forward, vec3_zero);
+
+
+	PFN_xrCreateMarkerDetectorML xrCreateMarkerDetectorML = (PFN_xrCreateMarkerDetectorML)backend_openxr_get_function("xrCreateMarkerDetectorML");
+	xrSnapshotMarkerDetectorML = (PFN_xrSnapshotMarkerDetectorML)backend_openxr_get_function("xrSnapshotMarkerDetectorML");
+	xrGetMarkerDetectorStateML = (PFN_xrGetMarkerDetectorStateML)backend_openxr_get_function("xrGetMarkerDetectorStateML");
+	xrGetMarkersML = (PFN_xrGetMarkersML)backend_openxr_get_function("xrGetMarkersML");
+	xrCreateMarkerSpaceML = (PFN_xrCreateMarkerSpaceML)backend_openxr_get_function("xrCreateMarkerSpaceML");
+	xrGetMarkerStringML = (PFN_xrGetMarkerStringML)backend_openxr_get_function("xrGetMarkerStringML");
+	xrGetMarkerNumberML = (PFN_xrGetMarkerNumberML)backend_openxr_get_function("xrGetMarkerNumberML");
+
+	XrMarkerDetectorCreateInfoML detectorCreateInfo{};
+	detectorCreateInfo.type = XR_TYPE_MARKER_DETECTOR_CREATE_INFO_ML;
+	detectorCreateInfo.next = nullptr;
+	detectorCreateInfo.profile = XR_MARKER_DETECTOR_PROFILE_DEFAULT_ML;
+	detectorCreateInfo.markerType = XR_MARKER_TYPE_QR_ML;
+
+	XrResult tempResult = xrCreateMarkerDetectorML((XrSession)backend_openxr_get_session(), &detectorCreateInfo, &markerDetector);
 }
+
+bool isReadyForSnapshot = true;
 
 void common_update() {
 	static app_focus_ prev_focus = app_focus_hidden;
@@ -221,6 +252,58 @@ void common_update() {
 		log_infof("Display Size:  %d<~BLK>x<~clr>%d", device_display_get_width(), device_display_get_height());
 	}
 	prev_focus = curr_focus;
+
+
+	if (isReadyForSnapshot)
+	{
+		// Call the first snapshot
+		XrMarkerDetectorSnapshotInfoML detectorInfo{ XR_TYPE_MARKER_DETECTOR_SNAPSHOT_INFO_ML };
+		XrResult tempResult = xrSnapshotMarkerDetectorML(markerDetector, &detectorInfo);
+		isReadyForSnapshot = false;
+	}
+	else
+	{
+		XrMarkerDetectorStateML state{ XR_TYPE_MARKER_DETECTOR_STATE_ML };
+		XrResult tempResult = xrGetMarkerDetectorStateML(markerDetector, &state);
+
+		if (state.state == XR_MARKER_DETECTOR_STATUS_READY_ML)
+		{
+			uint32_t markerCount;
+			tempResult = xrGetMarkersML(markerDetector, 0, &markerCount, nullptr);
+
+			std::vector<XrMarkerML> markers(markerCount);
+			tempResult = xrGetMarkersML(markerDetector, markerCount, &markerCount, markers.data());
+
+			std::unordered_map <uint64_t, XrSpace> markerSpaceMap;
+
+			for (uint32_t i = 0; i < markerCount; ++i)
+			{
+				uint64_t number;
+				XrResult getMarkerNumberResult = xrGetMarkerNumberML(markerDetector, markers[i], &number);
+
+				// Track every marker we find.
+				if (markerSpaceMap.find(number) == markerSpaceMap.end())
+				{
+					// New entry
+					XrSpace space;
+					XrMarkerSpaceCreateInfoML spaceCreateInfo{ XR_TYPE_MARKER_SPACE_CREATE_INFO_ML };
+					spaceCreateInfo.markerDetector = markerDetector;
+					spaceCreateInfo.marker = markers[i];
+					spaceCreateInfo.poseInMarkerSpace = { {0, 0, 0, 1}, {0, 0, 0} };
+
+					tempResult = xrCreateMarkerSpaceML((XrSession)backend_openxr_get_session(), &spaceCreateInfo, &space);
+					markerSpaceMap[number] = space;
+				}
+
+				uint32_t stringSize;
+				tempResult = xrGetMarkerStringML(markerDetector, markers[i], 0, &stringSize, nullptr);
+				std::string markerString(stringSize, ' ');
+				tempResult = xrGetMarkerStringML(markerDetector, markers[i], stringSize, &stringSize, &markerString[0]);
+			}
+
+			isReadyForSnapshot = true;
+		}
+	}
 
 	scene_update();
 
