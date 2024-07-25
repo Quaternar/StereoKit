@@ -23,8 +23,11 @@ struct inst_t {
 cbuffer transform_buffer : register(b2) {
 	inst_t sk_inst[819]; // 819 is UINT16_MAX / sizeof(inst_t)
 };
-TextureCube  sk_cubemap   : register(t11);
+Texture2D    sk_cubemap   : register(t11);
 SamplerState sk_cubemap_s : register(s11);
+
+Texture2D    sk_cubemap_depth : register(t12);
+SamplerState sk_cubemap_depth_s : register(s12);
 
 ///////////////////////////////////////////
 

@@ -34,7 +34,7 @@ psIn vs(vsIn input, uint id : SV_InstanceID) {
 
 psOut ps(psIn input) {
 	psOut result;
-	result.color = sk_cubemap.Sample(sk_cubemap_s, input.norm);
-	result.depth = 0.99999;
+	result.color = sk_cubemap.Sample(sk_cubemap_s, float2(input.pos.x / 1500, input.pos.y / 1000)); // TODO: change constants 1500 and 1000
+	result.depth = sk_cubemap_depth.Sample(sk_cubemap_depth_s, float2(input.pos.x / 1500, input.pos.y / 1000));
 	return result;
 }
