@@ -163,6 +163,7 @@ static render_state_t local = {};
 
 const int32_t    render_instance_max     = 819;
 const int32_t    render_skytex_register  = 11;
+const int32_t    render_skytex_depth_register = 12;
 const skg_bind_t render_list_global_bind = { 1,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
 const skg_bind_t render_list_inst_bind   = { 2,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
 const skg_bind_t render_list_blit_bind   = { 2,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
@@ -238,8 +239,8 @@ bool render_init() {
 	local.sky_mat_default = material_create(shader_sky);
 	material_set_id          (local.sky_mat_default, "sk/render/skybox_material");
 	material_set_queue_offset(local.sky_mat_default, 100);
-	material_set_depth_write (local.sky_mat_default, false);
-	material_set_depth_test  (local.sky_mat_default, depth_test_less_or_eq);
+	material_set_depth_write (local.sky_mat_default, true);
+	material_set_depth_test  (local.sky_mat_default, depth_test_less);
 	render_set_skymaterial(local.sky_mat_default);
 	shader_release(shader_sky);
 
@@ -529,6 +530,15 @@ void render_set_skytex(tex_t sky_texture) {
 		tex_set_fallback(sky_texture, local.global_textures[render_skytex_register]);
 	}
 	render_global_texture(render_skytex_register, sky_texture);
+}
+
+void render_set_skytex_with_depth(tex_t sky_texture, tex_t sky_depth_texture) {
+	if (sky_texture != nullptr && local.global_textures[render_skytex_register] != nullptr) {
+		tex_set_fallback(sky_texture, local.global_textures[render_skytex_register]);
+	}
+
+	render_global_texture(render_skytex_register, sky_texture);
+	render_global_texture(render_skytex_depth_register, sky_depth_texture);
 }
 
 ///////////////////////////////////////////

@@ -1607,6 +1607,7 @@ SK_API projection_           render_get_projection (void);
 SK_API matrix                render_get_cam_root   (void);
 SK_API void                  render_set_cam_root   (const sk_ref(matrix) cam_root);
 SK_API void                  render_set_skytex     (tex_t sky_texture);
+SK_API void                  render_set_skytex_with_depth(tex_t sky_texture, tex_t sky_depth_texture);
 SK_API tex_t                 render_get_skytex     (void);
 SK_API void                  render_set_skymaterial(material_t sky_material);
 SK_API material_t            render_get_skymaterial(void);

@@ -9,6 +9,11 @@ struct psIn {
 	uint view_id : SV_RenderTargetArrayIndex;
 };
 
+struct psOut {
+	float4 color : SV_Target;
+	float  depth : SV_Depth;
+};
+
 psIn vs(vsIn input, uint id : SV_InstanceID) {
 	psIn o;
 	o.view_id = id % sk_view_count;
@@ -20,6 +25,10 @@ psIn vs(vsIn input, uint id : SV_InstanceID) {
 	return o;
 }
 
-float4 ps(psIn input) : SV_TARGET {
-	return sk_cubemap.Sample(sk_cubemap_s, input.norm);
+psOut ps(psIn input) {
+	psOut result{};
+	result.color = sk_cubemap.Sample(sk_cubemap_s, float2(input.pos.x / 1500, input.pos.y / 1000)); // TODO: change constants 1500 and 1000
+	result.depth = sk_cubemap_depth.Sample(sk_cubemap_depth_s, float2(input.pos.x / 1500, input.pos.y / 1000));
+
+	return result;
 }
