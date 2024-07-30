@@ -26,9 +26,25 @@ psIn vs(vsIn input, uint id : SV_InstanceID) {
 }
 
 psOut ps(psIn input) {
-	psOut result{};
-	result.color = sk_cubemap.Sample(sk_cubemap_s, float2(input.pos.x / 1500, input.pos.y / 1000)); // TODO: change constants 1500 and 1000
-	result.depth = sk_cubemap_depth.Sample(sk_cubemap_depth_s, float2(input.pos.x / 1500, input.pos.y / 1000));
+	float2 uvCoordinates = float2(input.pos.x / 1500, input.pos.y / 1000); // TODO: change constants 1500 and 1000
+
+	float4 color;
+	float depth;
+
+	if (input.view_id == 0) // left eye
+	{
+		color = sk_cubemap_color_left.Sample(sk_cubemap_color_left_sampler, uvCoordinates);
+		depth = sk_cubemap_depth_left.Sample(sk_cubemap_depth_left_sampler, uvCoordinates);
+	}
+	else // right eye
+	{
+		color = sk_cubemap_color_right.Sample(sk_cubemap_color_right_sampler, uvCoordinates);
+		depth = sk_cubemap_depth_right.Sample(sk_cubemap_depth_right_sampler, uvCoordinates);
+	}
+
+	psOut result;
+	result.color = color;
+	result.depth = depth;
 
 	return result;
 }

@@ -24,11 +24,18 @@ struct inst_t {
 cbuffer transform_buffer : register(b2) {
 	inst_t sk_inst[819]; // 819 is UINT16_MAX / sizeof(inst_t)
 };
-Texture2D  sk_cubemap   : register(t11);
-SamplerState sk_cubemap_s : register(s11);
 
-Texture2D sk_cubemap_depth : register(t12);
-SamplerState sk_cubemap_depth_s : register(s12);
+// Color
+Texture2D  sk_cubemap_color_left   : register(t11);
+SamplerState sk_cubemap_color_left_sampler : register(s11);
+Texture2D sk_cubemap_color_right : register(t12);
+SamplerState sk_cubemap_color_right_sampler : register(s12);
+
+// Depth
+Texture2D sk_cubemap_depth_left : register(t13);
+SamplerState sk_cubemap_depth_left_sampler : register(s13);
+Texture2D sk_cubemap_depth_right : register(t14);
+SamplerState sk_cubemap_depth_right_sampler : register(s14);
 
 
 ///////////////////////////////////////////

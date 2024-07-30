@@ -162,8 +162,12 @@ struct render_state_t {
 static render_state_t local = {};
 
 const int32_t    render_instance_max     = 819;
-const int32_t    render_skytex_register  = 11;
-const int32_t    render_skytex_depth_register = 12;
+
+const int32_t    render_skytex_color_register_left = 11;
+const int32_t    render_skytex_color_register_right = 12;
+const int32_t    render_skytex_depth_register_left = 13;
+const int32_t    render_skytex_depth_register_right = 14;
+
 const skg_bind_t render_list_global_bind = { 1,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
 const skg_bind_t render_list_inst_bind   = { 2,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
 const skg_bind_t render_list_blit_bind   = { 2,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
@@ -526,27 +530,28 @@ void render_set_skytex(tex_t sky_texture) {
 		return;
 	}
 
-	if (sky_texture != nullptr && local.global_textures[render_skytex_register] != nullptr) {
-		tex_set_fallback(sky_texture, local.global_textures[render_skytex_register]);
+	if (sky_texture != nullptr && local.global_textures[render_skytex_color_register_left] != nullptr) {
+		tex_set_fallback(sky_texture, local.global_textures[render_skytex_color_register_left]);
 	}
-	render_global_texture(render_skytex_register, sky_texture);
+	render_global_texture(render_skytex_color_register_left, sky_texture);
 }
 
-void render_set_skytex_with_depth(tex_t sky_texture, tex_t sky_depth_texture) {
-	if (sky_texture != nullptr && local.global_textures[render_skytex_register] != nullptr) {
-		tex_set_fallback(sky_texture, local.global_textures[render_skytex_register]);
-	}
+void render_set_skytex_with_depth(tex_t sky_color_texture_left, tex_t sky_color_texture_right, tex_t sky_depth_texture_left, tex_t sky_depth_texture_right) {
+	// color
+	render_global_texture(render_skytex_color_register_left, sky_color_texture_left);
+	render_global_texture(render_skytex_color_register_right, sky_color_texture_right);
 
-	render_global_texture(render_skytex_register, sky_texture);
-	render_global_texture(render_skytex_depth_register, sky_depth_texture);
+	// depth
+	render_global_texture(render_skytex_depth_register_left, sky_depth_texture_left);
+	render_global_texture(render_skytex_depth_register_right, sky_depth_texture_right);
 }
 
 ///////////////////////////////////////////
 
 tex_t render_get_skytex() {
-	if (local.global_textures[render_skytex_register] != nullptr)
-		tex_addref(local.global_textures[render_skytex_register]);
-	return local.global_textures[render_skytex_register];
+	if (local.global_textures[render_skytex_color_register_left] != nullptr)
+		tex_addref(local.global_textures[render_skytex_color_register_left]);
+	return local.global_textures[render_skytex_color_register_left];
 }
 
 ///////////////////////////////////////////
@@ -796,7 +801,7 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 
 	// TODO: This is a little odd now that textures like this go through the
 	// render_global_textures system.
-	tex_t sky_tex = local.global_textures[render_skytex_register];
+	tex_t sky_tex = local.global_textures[render_skytex_color_register_left];
 	local.global_buffer.cubemap_i = sky_tex != nullptr
 		? vec4{ (float)sky_tex->width, (float)sky_tex->height, floorf(log2f((float)sky_tex->width)), 0 }
 		: vec4{};

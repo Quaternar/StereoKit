@@ -43,7 +43,7 @@ float4 sk_pbr_shade(float4 albedo, float3 irradiance, float3 ao, float metal, fl
 
 	float mip = (1 - pow(1 - rough, 2)) * sk_cubemap_i.z;
 	mip = max(mip, sk_pbr_mip_level(ndotv));
-	float3 prefilteredColor = sk_cubemap.SampleLevel(sk_cubemap_s, reflection, mip).rgb;
+	float3 prefilteredColor = sk_cubemap_color_left.SampleLevel(sk_cubemap_color_left_sampler, reflection, mip).rgb;
 	float2 envBRDF          = sk_pbr_brdf_appx(rough, ndotv);
 	float3 specular         = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
