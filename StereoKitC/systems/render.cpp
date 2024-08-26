@@ -72,6 +72,8 @@ struct render_global_buffer_t {
 	float    time;
 	uint32_t view_count;
 	uint32_t eye_offset;
+	uint32_t viewport_width;
+	uint32_t viewport_height;
 };
 struct render_blit_data_t {
 	float width;
@@ -805,6 +807,11 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 	local.global_buffer.cubemap_i = sky_tex != nullptr
 		? vec4{ (float)sky_tex->width, (float)sky_tex->height, floorf(log2f((float)sky_tex->width)), 0 }
 		: vec4{};
+
+	// Set width and height of viewport in shader globals
+	skg_tex_t* target = skg_tex_target_get();
+	local.global_buffer.viewport_width = target->width;
+	local.global_buffer.viewport_height = target->height;
 
 	// Upload shader globals and set them active!
 	material_buffer_set_data(local.shader_globals, &local.global_buffer);

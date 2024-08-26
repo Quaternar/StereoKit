@@ -26,7 +26,7 @@ psIn vs(vsIn input, uint id : SV_InstanceID) {
 }
 
 psOut ps(psIn input) {
-	float2 uvCoordinates = float2(input.pos.x / 1500, input.pos.y / 1000); // TODO: change constants 1500 and 1000
+	float2 uvCoordinates = float2(input.pos.x / sk_viewport_width, input.pos.y / sk_viewport_height);
 
 	float4 color;
 	float depth;
