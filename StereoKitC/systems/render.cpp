@@ -1526,4 +1526,23 @@ void radix_sort7(render_item_t *a, size_t count) {
 	}
 }
 
+bool render_get_viewport_resolution(uint32_t& out_width, uint32_t& out_height) {
+	skg_tex_t* target = skg_tex_target_get();
+
+	if (target != nullptr)
+	{
+		out_width = target->width;
+		out_height = target->height;
+
+		return true;
+	}
+	else
+	{
+		out_width = 0;
+		out_height = 0;
+
+		return false;
+	}
+}
+
 } // namespace sk
