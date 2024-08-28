@@ -13,6 +13,10 @@ cbuffer stereokit_buffer : register(b1) {
 	float4   sk_camera_dir [2];
 	float4   sk_fingertip  [2];
 	float4   sk_cubemap_i;
+	float3   sk_table_min;
+	float    _table_padding_1;
+	float3   sk_table_max;
+	float    _table_padding_2;
 	float    sk_time;
 	uint     sk_view_count;
 	uint     sk_eye_offset;

@@ -69,6 +69,10 @@ struct render_global_buffer_t {
 	vec4     camera_dir[2];
 	vec4     fingertip[2];
 	vec4     cubemap_i;
+	vec3     table_min;
+	float    _table_padding_1;
+	vec3     table_max;
+	float    _table_padding_2;
 	float    time;
 	uint32_t view_count;
 	uint32_t eye_offset;
