@@ -46,5 +46,28 @@ psOut ps(psIn input) {
 	result.color = color;
 	result.depth = depth;
 
+	// NDC
+	float2 ndc;
+	ndc.x = (input.pos.x / sk_viewport_width) * 2.0f - 1.0f;
+	ndc.y = 1.0f - (input.pos.y / sk_viewport_height) * 2.0f; // flip Y
+
+	// Homogeneous coordinates
+	float4 homogeneous = float4(ndc.x, ndc.y, depth, 1.0f);
+
+	// View space
+	float4 viewPosition = mul(sk_proj_inv[input.view_id], homogeneous);
+	viewPosition /= viewPosition.w;
+
+	// World space
+	float4 worldPosition = mul(sk_view[input.view_id], viewPosition);
+
+	// Check whether world space coordinates are within table bounds
+	if (worldPosition.x < sk_table_min.x || worldPosition.x > sk_table_max.x ||
+		worldPosition.y < sk_table_min.y || worldPosition.y > sk_table_max.y ||
+		worldPosition.z < sk_table_min.z || worldPosition.z > sk_table_max.z)
+	{
+		discard;
+	}
+
 	return result;
 }
