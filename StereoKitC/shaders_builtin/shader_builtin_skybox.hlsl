@@ -34,12 +34,12 @@ psOut ps(psIn input) {
 	if (input.view_id == 0) // left eye
 	{
 		color = sk_cubemap_color_left.Sample(sk_cubemap_color_left_sampler, uvCoordinates);
-		depth = sk_cubemap_depth_left.Sample(sk_cubemap_depth_left_sampler, uvCoordinates);
+		depth = sk_cubemap_depth_left.Sample(sk_cubemap_depth_left_sampler, uvCoordinates).x;
 	}
 	else // right eye
 	{
 		color = sk_cubemap_color_right.Sample(sk_cubemap_color_right_sampler, uvCoordinates);
-		depth = sk_cubemap_depth_right.Sample(sk_cubemap_depth_right_sampler, uvCoordinates);
+		depth = sk_cubemap_depth_right.Sample(sk_cubemap_depth_right_sampler, uvCoordinates).x;
 	}
 
 	psOut result;
