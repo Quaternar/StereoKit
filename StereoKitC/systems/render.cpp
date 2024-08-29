@@ -61,6 +61,7 @@ struct render_transform_buffer_t {
 };
 struct render_global_buffer_t {
 	XMMATRIX view[2];
+	XMMATRIX view_inv[2];
 	XMMATRIX proj[2];
 	XMMATRIX proj_inv[2];
 	XMMATRIX viewproj[2];
@@ -789,6 +790,7 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 		XMStoreFloat3((XMFLOAT3*)&local.global_buffer.camera_dir[i], cam_dir);
 
 		local.global_buffer.view    [i] = XMMatrixTranspose(view_f);
+		local.global_buffer.view_inv[i] = XMMatrixTranspose(view_inv);
 		local.global_buffer.proj    [i] = XMMatrixTranspose(projection_f);
 		local.global_buffer.proj_inv[i] = XMMatrixTranspose(proj_inv);
 		local.global_buffer.viewproj[i] = XMMatrixTranspose(view_f * projection_f);
