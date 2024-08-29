@@ -48,8 +48,8 @@ psOut ps(psIn input) {
 
 	// NDC
 	float2 ndc;
-	ndc.x = (input.pos.x / sk_viewport_width) * 2.0f - 1.0f;
-	ndc.y = 1.0f - (input.pos.y / sk_viewport_height) * 2.0f; // flip Y
+	ndc.x = uvCoordinates.x * 2.0f - 1.0f;
+	ndc.y = 1.0f - uvCoordinates.y * 2.0f; // flip Y
 
 	// Homogeneous coordinates
 	float4 homogeneous = float4(ndc.x, ndc.y, depth, 1.0f);
