@@ -55,11 +55,11 @@ psOut ps(psIn input) {
 	float4 homogeneous = float4(ndc.x, ndc.y, depth, 1.0f);
 
 	// View space
-	float4 viewPosition = mul(sk_proj_inv[input.view_id], homogeneous);
+	float4 viewPosition = mul(homogeneous, sk_proj_inv[input.view_id]);
 	viewPosition /= viewPosition.w;
 
 	// World space
-	float4 worldPosition = mul(sk_view[input.view_id], viewPosition);
+	float4 worldPosition = mul(viewPosition, sk_view_inv[input.view_id]);
 
 	// Check whether world space coordinates are within table bounds
 	if (worldPosition.x < sk_table_min.x || worldPosition.x > sk_table_max.x ||
