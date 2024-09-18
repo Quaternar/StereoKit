@@ -819,6 +819,10 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 	local.global_buffer.viewport_width = target->width;
 	local.global_buffer.viewport_height = target->height;
 
+	// Set table boundaries
+	local.global_buffer.table_min = sk::vec3{ 0.0f, 0.0f, -1000.0f };
+	local.global_buffer.table_max = sk::vec3{ 1000.0f, 1000.0f, 1000.0f };
+
 	// Upload shader globals and set them active!
 	material_buffer_set_data(local.shader_globals, &local.global_buffer);
 
