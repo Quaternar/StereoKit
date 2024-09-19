@@ -57,7 +57,7 @@ psOut ps(psIn input) {
 	ndc.y = 1.0f - uvCoordinates.y * 2.0f; // flip Y
 
 	// Homogeneous coordinates
-	float4 homogeneous = float4(ndc.x, ndc.y, depth, 1.0f);
+	float4 homogeneous = float4(ndc.x, ndc.y, result.depth, 1.0f);
 
 	// View space
 	float4 viewPosition = mul(homogeneous, sk_proj_inv[input.view_id]);
