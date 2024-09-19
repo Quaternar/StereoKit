@@ -48,7 +48,8 @@ psOut ps(psIn input) {
 	const float far = 20.0f;
 	const float near = 0.0001f;
 	const float linearDepth = (0.04f / depth); // 0.04f is far value in VRGB; near value is infinite, so it is not needed in these calculations
-	result.depth = (far + near)/(far - near) + (1 / linearDepth) * ((-2.0f * far * near)/(far - near));
+	const float stereoKitDepth = (far + near)/(far - near) + (1 / linearDepth) * ((-2.0f * far * near)/(far - near));
+	result.depth = (stereoKitDepth + 1.0f) / 2.0f;
 
 	// NDC
 	float2 ndc;
