@@ -79,6 +79,10 @@ struct render_global_buffer_t {
 	uint32_t eye_offset;
 	uint32_t viewport_width;
 	uint32_t viewport_height;
+	float    near;
+	float    far;
+	float    source_near;
+	float    source_far;
 };
 struct render_blit_data_t {
 	float width;
@@ -332,6 +336,14 @@ void render_set_clip(float near_plane, float far_plane) {
 	near_plane = fmaxf(0.001f, near_plane);
 	local.clip_planes = { near_plane, far_plane };
 	render_update_projection();
+
+	local.global_buffer.near = near_plane;
+	local.global_buffer.far = far_plane;
+}
+
+void render_set_clip_source_app(float near_plane, float far_plane) {
+	local.global_buffer.source_near = near_plane;
+	local.global_buffer.source_far = far_plane;
 }
 
 ///////////////////////////////////////////
