@@ -28,27 +28,53 @@ psIn vs(vsIn input, uint id : SV_InstanceID) {
 psOut ps(psIn input) {
 	float2 uvCoordinates = float2(input.pos.x / sk_viewport_width, input.pos.y / sk_viewport_height);
 
-	float4 color;
-	float depth;
+	float4 sampledColor;
+	float sampledDepth;
 
 	if (input.view_id == 0) // left eye
 	{
-		color = sk_cubemap_color_left.Sample(sk_cubemap_color_left_sampler, uvCoordinates);
-		depth = sk_cubemap_depth_left.Sample(sk_cubemap_depth_left_sampler, uvCoordinates).x;
+		sampledColor = sk_cubemap_color_left.Sample(sk_cubemap_color_left_sampler, uvCoordinates);
+		sampledDepth = sk_cubemap_depth_left.Sample(sk_cubemap_depth_left_sampler, uvCoordinates).x;
 	}
 	else // right eye
 	{
-		color = sk_cubemap_color_right.Sample(sk_cubemap_color_right_sampler, uvCoordinates);
-		depth = sk_cubemap_depth_right.Sample(sk_cubemap_depth_right_sampler, uvCoordinates).x;
+		sampledColor = sk_cubemap_color_right.Sample(sk_cubemap_color_right_sampler, uvCoordinates);
+		sampledDepth = sk_cubemap_depth_right.Sample(sk_cubemap_depth_right_sampler, uvCoordinates).x;
 	}
 
 	psOut result;
-	result.color = color;
-	const float linearDepth = sk_source_far / depth;
-	//const float linearDepth = sk_source_near * sk_source_far / (sk_source_far + depth * (sk_source_near - sk_source_far)); // TODO: use this
-	// TODO: case with reversed Z
-	const float stereoKitDepth = (sk_far + sk_near)/(sk_far - sk_near) + (1 / linearDepth) * ((-2.0f * sk_far * sk_near)/(sk_far - sk_near)); // range [-1; 1]
-	result.depth = (stereoKitDepth + 1.0f) / 2.0f; // range [-1; 1]
+
+	// color
+	result.color = sampledColor;
+
+	// linearize depth
+	float linearDepth;
+	if (sk_source_near < sk_source_far) // standard Z
+	{
+		if (isinf(sk_source_far)) // infinity
+		{
+			linearDepth = sk_source_near / sampledDepth; // TODO: not tested
+		}
+		else
+		{
+			linearDepth = (2.0f * sk_source_near * sk_source_far) / (sk_source_far + sk_source_near - sampledDepth * (sk_source_far - sk_source_near)); // TODO: not tested
+		}
+	}
+	else // reversed Z
+	{
+		if (isinf(sk_source_near)) // infinity
+		{
+			linearDepth = sk_source_far / sampledDepth;
+		}
+		else
+		{
+			linearDepth = (2.0f * sk_source_far * sk_source_near) / (sk_source_far - sk_source_near + sampledDepth * (sk_source_near - sk_source_far)); // TODO: not tested
+		}
+	}
+
+	// convert back to StereoKit depth
+	const float unlinearizedDepth = (sk_far + sk_near) / (sk_far - sk_near) + (1 / linearDepth) * ((-2.0f * sk_far * sk_near) / (sk_far - sk_near)); // range [-1; 1]
+	result.depth = (unlinearizedDepth + 1.0f) / 2.0f; // range [0; 1]
 
 	// NDC
 	float2 ndc;
