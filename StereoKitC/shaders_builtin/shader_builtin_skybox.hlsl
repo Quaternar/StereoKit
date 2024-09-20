@@ -57,7 +57,7 @@ psOut ps(psIn input) {
 		}
 		else
 		{
-			linearDepth = (2.0f * sk_source_near * sk_source_far) / (sk_source_far + sk_source_near - sampledDepth * (sk_source_far - sk_source_near)); // TODO: not tested
+			linearDepth = (2.0f * sk_source_near * sk_source_far) / (sk_source_far + sk_source_near - sampledDepth * (sk_source_far - sk_source_near));
 		}
 	}
 	else // reversed Z
