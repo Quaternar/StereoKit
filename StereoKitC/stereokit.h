@@ -1606,6 +1606,7 @@ typedef enum projection_ {
 
 //TODO: for v0.4, rename render_set_clip and render_set_fov to indicate they are only for perspective
 SK_API void                  render_set_clip       (float near_plane sk_default(0.08f), float far_plane sk_default(50));
+SK_API void                  render_set_clip_source_app (float near_plane, float far_plane);
 SK_API void                  render_set_fov        (float field_of_view_degrees sk_default(90.0f));
 SK_API void                  render_set_ortho_clip (float near_plane sk_default(0.0f), float far_plane sk_default(50));
 SK_API void                  render_set_ortho_size (float viewport_height_meters);
@@ -1647,6 +1648,7 @@ SK_API void                  render_screenshot_viewpoint(void (*render_on_screen
 SK_API void                  render_to             (tex_t to_rendertarget, const sk_ref(matrix) camera, const sk_ref(matrix) projection, render_layer_ layer_filter sk_default(render_layer_all), render_clear_ clear sk_default(render_clear_all), rect_t viewport sk_default({}));
 SK_API void                  render_material_to    (tex_t to_rendertarget, material_t override_material, const sk_ref(matrix) camera, const sk_ref(matrix) projection, render_layer_ layer_filter sk_default(render_layer_all), render_clear_ clear sk_default(render_clear_all), rect_t viewport sk_default({}));
 SK_API void                  render_get_device     (void **device, void **context);
+SK_API bool                  render_get_viewport_resolution(uint32_t& out_width, uint32_t& out_height);
 
 ///////////////////////////////////////////
 

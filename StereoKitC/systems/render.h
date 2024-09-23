@@ -60,5 +60,6 @@ void          render_list_execute         (render_list_t list, render_layer_ fil
 void          render_list_execute_material(render_list_t list, render_layer_ filter, uint32_t view_count, int32_t queue_start, int32_t queue_end, material_t override_material);
 void          render_list_clear           (render_list_t list);
 int32_t       render_list_item_count      (render_list_t list);
+bool          render_get_viewport_resolution(uint32_t& out_width, uint32_t& out_height);
 
 } // namespace sk

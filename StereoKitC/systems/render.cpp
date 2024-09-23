@@ -61,6 +61,7 @@ struct render_transform_buffer_t {
 };
 struct render_global_buffer_t {
 	XMMATRIX view[2];
+	XMMATRIX view_inv[2];
 	XMMATRIX proj[2];
 	XMMATRIX proj_inv[2];
 	XMMATRIX viewproj[2];
@@ -69,9 +70,19 @@ struct render_global_buffer_t {
 	vec4     camera_dir[2];
 	vec4     fingertip[2];
 	vec4     cubemap_i;
+	vec3     table_min;
+	float    _table_padding_1;
+	vec3     table_max;
+	float    _table_padding_2;
 	float    time;
 	uint32_t view_count;
 	uint32_t eye_offset;
+	uint32_t viewport_width;
+	uint32_t viewport_height;
+	float    near;
+	float    far;
+	float    source_near;
+	float    source_far;
 };
 struct render_blit_data_t {
 	float width;
@@ -325,6 +336,14 @@ void render_set_clip(float near_plane, float far_plane) {
 	near_plane = fmaxf(0.001f, near_plane);
 	local.clip_planes = { near_plane, far_plane };
 	render_update_projection();
+
+	local.global_buffer.near = near_plane;
+	local.global_buffer.far = far_plane;
+}
+
+void render_set_clip_source_app(float near_plane, float far_plane) {
+	local.global_buffer.source_near = near_plane;
+	local.global_buffer.source_far = far_plane;
 }
 
 ///////////////////////////////////////////
@@ -783,6 +802,7 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 		XMStoreFloat3((XMFLOAT3*)&local.global_buffer.camera_dir[i], cam_dir);
 
 		local.global_buffer.view    [i] = XMMatrixTranspose(view_f);
+		local.global_buffer.view_inv[i] = XMMatrixTranspose(view_inv);
 		local.global_buffer.proj    [i] = XMMatrixTranspose(projection_f);
 		local.global_buffer.proj_inv[i] = XMMatrixTranspose(proj_inv);
 		local.global_buffer.viewproj[i] = XMMatrixTranspose(view_f * projection_f);
@@ -805,6 +825,15 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 	local.global_buffer.cubemap_i = sky_tex != nullptr
 		? vec4{ (float)sky_tex->width, (float)sky_tex->height, floorf(log2f((float)sky_tex->width)), 0 }
 		: vec4{};
+
+	// Set width and height of viewport in shader globals
+	skg_tex_t* target = skg_tex_target_get();
+	local.global_buffer.viewport_width = target->width;
+	local.global_buffer.viewport_height = target->height;
+
+	// Set table boundaries
+	local.global_buffer.table_min = sk::vec3{ 0.0f, 0.0f, -1000.0f };
+	local.global_buffer.table_max = sk::vec3{ 1000.0f, 1000.0f, 1000.0f };
 
 	// Upload shader globals and set them active!
 	material_buffer_set_data(local.shader_globals, &local.global_buffer);
@@ -1516,6 +1545,25 @@ void radix_sort7(render_item_t *a, size_t count) {
 	// not the original array "a", do a final copy
 	if (from != a) {
 		memcpy(a, from, count*sizeof(render_item_t));
+	}
+}
+
+bool render_get_viewport_resolution(uint32_t& out_width, uint32_t& out_height) {
+	skg_tex_t* target = skg_tex_target_get();
+
+	if (target != nullptr)
+	{
+		out_width = target->width;
+		out_height = target->height;
+
+		return true;
+	}
+	else
+	{
+		out_width = 0;
+		out_height = 0;
+
+		return false;
 	}
 }
 

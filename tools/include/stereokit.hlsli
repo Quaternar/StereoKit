@@ -5,6 +5,7 @@
 
 cbuffer stereokit_buffer : register(b1) {
 	float4x4 sk_view       [2];
+	float4x4 sk_view_inv   [2];
 	float4x4 sk_proj       [2];
 	float4x4 sk_proj_inv   [2];
 	float4x4 sk_viewproj   [2];
@@ -13,9 +14,19 @@ cbuffer stereokit_buffer : register(b1) {
 	float4   sk_camera_dir [2];
 	float4   sk_fingertip  [2];
 	float4   sk_cubemap_i;
+	float3   sk_table_min;
+	float    _table_padding_1;
+	float3   sk_table_max;
+	float    _table_padding_2;
 	float    sk_time;
 	uint     sk_view_count;
 	uint     sk_eye_offset;
+	uint     sk_viewport_width;
+	uint     sk_viewport_height;
+	float    sk_near;
+	float    sk_far;
+	float    sk_source_near;
+	float    sk_source_far;
 };
 struct inst_t {
 	float4x4 world;
