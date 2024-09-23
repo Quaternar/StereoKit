@@ -652,7 +652,7 @@ bool openxr_preferred_blend(XrViewConfigurationType view_type, display_blend_ pr
 	blend_modes = sk_malloc_t(XrEnvironmentBlendMode, blend_count);
 	xr_check2(xrEnumerateEnvironmentBlendModes(xr_instance, xr_system_id, view_type, blend_count, &blend_count, blend_modes),
 		"xrEnumerateEnvironmentBlendModes");
-	
+
 	*out_blend = XR_ENVIRONMENT_BLEND_MODE_MAX_ENUM;
 	*out_valid = display_blend_none;
 	for (uint32_t i = 0; i < blend_count; i++) {
@@ -838,7 +838,28 @@ void openxr_projection(XrFovf fov, float clip_near, float clip_far, float *resul
 }
 
 ///////////////////////////////////////////
+void log_xr_view(const XrView* view) {
+	log_diagf("XrView:");
+	log_diagf("  Type: %lld", (long long)view->type);
+	log_diagf("  Next: %p", (void*)view->next);
 
+	log_diagf("  Pose:");
+	log_diagf("    Position: (%.3f, %.3f, %.3f)",
+		view->pose.position.x,
+		view->pose.position.y,
+		view->pose.position.z);
+	log_diagf("    Orientation: (%.3f, %.3f, %.3f, %.3f)",
+		view->pose.orientation.x,
+		view->pose.orientation.y,
+		view->pose.orientation.z,
+		view->pose.orientation.w);
+
+	log_diagf("  Fov:");
+	log_diagf("    AngleLeft: %.3f", view->fov.angleLeft);
+	log_diagf("    AngleRight: %.3f", view->fov.angleRight);
+	log_diagf("    AngleUp: %.3f", view->fov.angleUp);
+	log_diagf("    AngleDown: %.3f", view->fov.angleDown);
+}
 bool openxr_display_locate(device_display_t* display, XrTime at_time) {
 	// Find the state and location of each viewpoint at the predicted time
 	uint32_t         view_count  = 0;
@@ -855,6 +876,7 @@ bool openxr_display_locate(device_display_t* display, XrTime at_time) {
 	for (uint32_t i = 0; i < view_count; i++) {
 		// Set up our rendering information for the viewpoint we're using right
 		// now!
+		log_xr_view(&(display->view_xr[i]));
 		XrCompositionLayerProjectionView *view = &display->view_layers[i];
 		*view = { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };
 		view->pose = display->view_xr[i].pose;

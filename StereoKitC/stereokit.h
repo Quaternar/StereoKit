@@ -439,7 +439,14 @@ typedef struct system_info_t {
 	bool32_t       world_raycast_present;
 } system_info_t;
 
-SK_API bool32_t      sk_init               (sk_settings_t settings);
+typedef struct sk_external_platform_t {
+	bool (*func_initialize)(void);
+	void (*func_step_begin)(void);
+	void (*func_step_end)(void);
+	void (*func_shutdown)(void);
+} sk_external_platform_t;
+
+SK_API bool32_t      sk_init(sk_settings_t settings, sk_external_platform_t* paltform = nullptr);
 SK_API void          sk_set_window         (void *window);
 SK_API void          sk_set_window_xam     (void *window);
 SK_API void          sk_shutdown           (void);

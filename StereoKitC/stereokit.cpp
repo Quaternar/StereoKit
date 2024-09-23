@@ -80,7 +80,7 @@ bool32_t sk_step_end  ();
 
 ///////////////////////////////////////////
 
-bool32_t sk_init(sk_settings_t settings) {
+bool32_t sk_init(sk_settings_t settings, sk_external_platform_t* platform) {
 	local = {};
 	local.timev_scale = 1;
 
@@ -137,11 +137,19 @@ bool32_t sk_init(sk_settings_t settings) {
 	system_t sys_platform_render  = { "FrameRender" };
 
 	system_set_step_deps(sys_platform_render, "App", "Text", "Sprites", "Lines", "World", "UILate", "Animation");
+	if (platform) {
+		sys_platform       .func_initialize = platform->func_initialize;
+		sys_platform       .func_shutdown   = platform->func_shutdown;
+		sys_platform_begin .func_step       = platform->func_step_begin;
+		sys_platform_render.func_step       = platform->func_step_end;
+	}
+	else {
+		sys_platform       .func_initialize = platform_init;
+		sys_platform       .func_shutdown   = platform_shutdown;
+		sys_platform_begin .func_step       = platform_step_begin;
+		sys_platform_render.func_step       = platform_step_end;
+	}
 
-	sys_platform       .func_initialize = platform_init;
-	sys_platform       .func_shutdown   = platform_shutdown;
-	sys_platform_begin .func_step       = platform_step_begin;
-	sys_platform_render.func_step       = platform_step_end;
 
 	systems_add(&sys_platform);
 	systems_add(&sys_platform_begin);
