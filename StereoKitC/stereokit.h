@@ -2276,6 +2276,8 @@ typedef enum backend_xr_type_ {
 	backend_xr_type_openxr,
 	/*StereoKit is running in a browser, and is using WebXR!*/
 	backend_xr_type_webxr,
+	/*Stereokit will use backend provided during the initialization*/
+	backend_xr_type_external,
 } backend_xr_type_;
 
 /*This describes the platform that StereoKit is running on.*/

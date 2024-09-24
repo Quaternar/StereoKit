@@ -16,7 +16,8 @@ backend_xr_type_ backend_xr_get_type() {
 #elif defined(SK_XR_WEBXR)
 		return backend_xr_type_webxr;
 #else
-		log_err("Unimplemented XR backend code") // <-- Haha, see what I did there? No semicolon! :D
+		return backend_xr_type_external;
+		//log_err("Unimplemented XR backend code") // <-- Haha, see what I did there? No semicolon! :D
 #endif
 	} else {
 		if (sk_get_settings_ref()->disable_flatscreen_mr_sim) return backend_xr_type_none;

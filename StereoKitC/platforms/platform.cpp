@@ -67,11 +67,15 @@ bool        platform_set_mode (app_mode_ mode);
 void        platform_stop_mode();
 
 ///////////////////////////////////////////
-
+void create_local() {
+	if (local == nullptr) {
+		local = sk_malloc_zero_t(platform_state_t, 1);
+	}
+}
 bool platform_init() {
 	device_data_init(&device_data);
 
-	local = sk_malloc_zero_t(platform_state_t, 1);
+	create_local();
 	const sk_settings_t* settings = sk_get_settings_ref();
 
 	// Set up any platform dependent variables
@@ -219,18 +223,21 @@ void platform_set_window_xam(void *window) {
 
 
 bool32_t platform_keyboard_get_force_fallback() {
+	create_local();
 	return local->force_fallback_keyboard;
 }
 
 ///////////////////////////////////////////
 
 void platform_keyboard_set_force_fallback(bool32_t force_fallback) {
+	create_local();
 	local->force_fallback_keyboard = force_fallback;
 }
 
 ///////////////////////////////////////////
 
 void platform_keyboard_show(bool32_t visible, text_context_ type) {
+	create_local();
 	// If we're _forcing_ the fallback keyboard, this becomes quite simple!
 	if (local->force_fallback_keyboard) {
 		virtualkeyboard_open(visible, type);
@@ -266,6 +273,7 @@ void platform_keyboard_show(bool32_t visible, text_context_ type) {
 ///////////////////////////////////////////
 
 bool32_t platform_keyboard_visible() {
+	create_local();
 	return platform_xr_keyboard_present() && local->force_fallback_keyboard == false
 		? platform_xr_keyboard_visible()
 		: virtualkeyboard_get_open    ();
