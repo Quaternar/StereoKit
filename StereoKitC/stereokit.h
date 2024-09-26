@@ -1599,7 +1599,6 @@ typedef enum projection_ {
 
 //TODO: for v0.4, rename render_set_clip and render_set_fov to indicate they are only for perspective
 SK_API void                  render_set_clip       (float near_plane sk_default(0.08f), float far_plane sk_default(50));
-SK_API void                  render_set_clip_source_app (float near_plane, float far_plane);
 SK_API void                  render_set_fov        (float field_of_view_degrees sk_default(90.0f));
 SK_API void                  render_set_ortho_clip (float near_plane sk_default(0.0f), float far_plane sk_default(50));
 SK_API void                  render_set_ortho_size (float viewport_height_meters);
@@ -1608,7 +1607,6 @@ SK_API projection_           render_get_projection (void);
 SK_API matrix                render_get_cam_root   (void);
 SK_API void                  render_set_cam_root   (const sk_ref(matrix) cam_root);
 SK_API void                  render_set_skytex     (tex_t sky_texture);
-SK_API void                  render_set_skytex_with_depth(tex_t sky_color_texture_left, tex_t sky_color_texture_right, tex_t sky_depth_texture_left, tex_t sky_depth_texture_right);
 SK_API tex_t                 render_get_skytex     (void);
 SK_API void                  render_set_skymaterial(material_t sky_material);
 SK_API material_t            render_get_skymaterial(void);
@@ -1641,7 +1639,6 @@ SK_API void                  render_screenshot_viewpoint(void (*render_on_screen
 SK_API void                  render_to             (tex_t to_rendertarget, const sk_ref(matrix) camera, const sk_ref(matrix) projection, render_layer_ layer_filter sk_default(render_layer_all), render_clear_ clear sk_default(render_clear_all), rect_t viewport sk_default({}));
 SK_API void                  render_material_to    (tex_t to_rendertarget, material_t override_material, const sk_ref(matrix) camera, const sk_ref(matrix) projection, render_layer_ layer_filter sk_default(render_layer_all), render_clear_ clear sk_default(render_clear_all), rect_t viewport sk_default({}));
 SK_API void                  render_get_device     (void **device, void **context);
-SK_API bool                  render_get_viewport_resolution(uint32_t& out_width, uint32_t& out_height);
 
 ///////////////////////////////////////////
 
