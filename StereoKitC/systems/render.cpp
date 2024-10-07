@@ -70,19 +70,9 @@ struct render_global_buffer_t {
 	vec4     camera_dir[2];
 	vec4     fingertip[2];
 	vec4     cubemap_i;
-	vec3     table_min;
-	float    _table_padding_1;
-	vec3     table_max;
-	float    _table_padding_2;
 	float    time;
 	uint32_t view_count;
 	uint32_t eye_offset;
-	uint32_t viewport_width;
-	uint32_t viewport_height;
-	float    near;
-	float    far;
-	float    source_near;
-	float    source_far;
 };
 struct render_blit_data_t {
 	float width;
@@ -173,12 +163,7 @@ struct render_state_t {
 static render_state_t local = {};
 
 const int32_t    render_instance_max     = 819;
-
-const int32_t    render_skytex_color_register_left = 11;
-const int32_t    render_skytex_color_register_right = 12;
-const int32_t    render_skytex_depth_register_left = 13;
-const int32_t    render_skytex_depth_register_right = 14;
-
+const int32_t    render_skytex_register  = 11;
 const skg_bind_t render_list_global_bind = { 1,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
 const skg_bind_t render_list_inst_bind   = { 2,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
 const skg_bind_t render_list_blit_bind   = { 2,  skg_stage_vertex | skg_stage_pixel, skg_register_constant };
@@ -254,8 +239,8 @@ bool render_init() {
 	local.sky_mat_default = material_create(shader_sky);
 	material_set_id          (local.sky_mat_default, "sk/render/skybox_material");
 	material_set_queue_offset(local.sky_mat_default, 100);
-	material_set_depth_write (local.sky_mat_default, true);
-	material_set_depth_test  (local.sky_mat_default, depth_test_less);
+	material_set_depth_write(local.sky_mat_default, false);
+	material_set_depth_test(local.sky_mat_default, depth_test_less_or_eq);
 	render_set_skymaterial(local.sky_mat_default);
 	shader_release(shader_sky);
 
@@ -336,14 +321,6 @@ void render_set_clip(float near_plane, float far_plane) {
 	near_plane = fmaxf(0.001f, near_plane);
 	local.clip_planes = { near_plane, far_plane };
 	render_update_projection();
-
-	local.global_buffer.near = near_plane;
-	local.global_buffer.far = far_plane;
-}
-
-void render_set_clip_source_app(float near_plane, float far_plane) {
-	local.global_buffer.source_near = near_plane;
-	local.global_buffer.source_far = far_plane;
 }
 
 ///////////////////////////////////////////
@@ -549,28 +526,18 @@ void render_set_skytex(tex_t sky_texture) {
 		return;
 	}
 
-	if (sky_texture != nullptr && local.global_textures[render_skytex_color_register_left] != nullptr) {
-		tex_set_fallback(sky_texture, local.global_textures[render_skytex_color_register_left]);
+	if (sky_texture != nullptr && local.global_textures[render_skytex_register] != nullptr) {
+		tex_set_fallback(sky_texture, local.global_textures[render_skytex_register]);
 	}
-	render_global_texture(render_skytex_color_register_left, sky_texture);
-}
-
-void render_set_skytex_with_depth(tex_t sky_color_texture_left, tex_t sky_color_texture_right, tex_t sky_depth_texture_left, tex_t sky_depth_texture_right) {
-	// color
-	render_global_texture(render_skytex_color_register_left, sky_color_texture_left);
-	render_global_texture(render_skytex_color_register_right, sky_color_texture_right);
-
-	// depth
-	render_global_texture(render_skytex_depth_register_left, sky_depth_texture_left);
-	render_global_texture(render_skytex_depth_register_right, sky_depth_texture_right);
+	render_global_texture(render_skytex_register, sky_texture);
 }
 
 ///////////////////////////////////////////
 
 tex_t render_get_skytex() {
-	if (local.global_textures[render_skytex_color_register_left] != nullptr)
-		tex_addref(local.global_textures[render_skytex_color_register_left]);
-	return local.global_textures[render_skytex_color_register_left];
+	if (local.global_textures[render_skytex_register] != nullptr)
+		tex_addref(local.global_textures[render_skytex_register]);
+	return local.global_textures[render_skytex_register];
 }
 
 ///////////////////////////////////////////
@@ -821,19 +788,10 @@ void render_draw_queue(const matrix *views, const matrix *projections, int32_t e
 
 	// TODO: This is a little odd now that textures like this go through the
 	// render_global_textures system.
-	tex_t sky_tex = local.global_textures[render_skytex_color_register_left];
+	tex_t sky_tex = local.global_textures[render_skytex_register];
 	local.global_buffer.cubemap_i = sky_tex != nullptr
 		? vec4{ (float)sky_tex->width, (float)sky_tex->height, floorf(log2f((float)sky_tex->width)), 0 }
 		: vec4{};
-
-	// Set width and height of viewport in shader globals
-	skg_tex_t* target = skg_tex_target_get();
-	local.global_buffer.viewport_width = target->width;
-	local.global_buffer.viewport_height = target->height;
-
-	// Set table boundaries
-	local.global_buffer.table_min = sk::vec3{ 0.0f, 0.0f, -1000.0f };
-	local.global_buffer.table_max = sk::vec3{ 1000.0f, 1000.0f, 1000.0f };
 
 	// Upload shader globals and set them active!
 	material_buffer_set_data(local.shader_globals, &local.global_buffer);
@@ -1545,25 +1503,6 @@ void radix_sort7(render_item_t *a, size_t count) {
 	// not the original array "a", do a final copy
 	if (from != a) {
 		memcpy(a, from, count*sizeof(render_item_t));
-	}
-}
-
-bool render_get_viewport_resolution(uint32_t& out_width, uint32_t& out_height) {
-	skg_tex_t* target = skg_tex_target_get();
-
-	if (target != nullptr)
-	{
-		out_width = target->width;
-		out_height = target->height;
-
-		return true;
-	}
-	else
-	{
-		out_width = 0;
-		out_height = 0;
-
-		return false;
 	}
 }
 
