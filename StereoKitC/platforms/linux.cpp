@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* The authors below grant copyright rights under the MIT license:
- * Copyright (c) 2019-2023 Nick Klingensmith
- * Copyright (c) 2023 Qualcomm Technologies, Inc.
+ * Copyright (c) 2019-2024 Nick Klingensmith
+ * Copyright (c) 2023-2024 Qualcomm Technologies, Inc.
  */
 
 #include "linux.h"
@@ -19,6 +19,8 @@
 #include <libgen.h>
 #include <fontconfig/fontconfig.h>
 
+#include <sk_gpu.h>
+
 #include "../xr_backends/openxr.h"
 #include "../systems/render.h"
 #include "../systems/input_keyboard.h"
@@ -28,7 +30,6 @@
 #include "../log.h"
 #include "../sk_math.h"
 #include "../asset_types/texture.h"
-#include "../libraries/sk_gpu.h"
 #include "../libraries/sokol_time.h"
 #include "../libraries/unicode.h"
 #include "../libraries/stref.h"
@@ -593,7 +594,6 @@ bool platform_xr_keyboard_visible()          { return false; }
 
 ///////////////////////////////////////////
 
-void platform_debug_output   (log_, const char*) { }
 void platform_print_callstack() { }
 
 } // namespace sk

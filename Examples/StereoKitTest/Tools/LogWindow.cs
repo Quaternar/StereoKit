@@ -53,6 +53,8 @@ namespace StereoKit.Framework
 
 		void OnLog(LogLevel level, string logText)
 		{
+			if (level == LogLevel.Error)
+				level = LogLevel.Error;
 			if (items.Count>0 && items[items.Count-1].text == logText) {
 				LogItem item = items[items.Count - 1];
 				item.count++;
@@ -204,7 +206,7 @@ namespace StereoKit.Framework
 				Text.Add(((int)min).ToString(), Matrix.TS(at.x-size.x, at.y-size.y, at.z, textScale), V.XY(labelWidth*textScale, 1), TextFit.Overflow, style, TextAlign.BottomLeft, TextAlign.BottomLeft);
 				Text.Add(label,                 Matrix.TS(at.x,        at.y,        at.z, textScale),                                                  style, TextAlign.TopLeft,    TextAlign.TopLeft);
 
-				Lines.Add(at+V.XY0(-Text.Size(label, style).x*textScale - 0.002f, 0), at + V.XY0(-size.x, 0), new Color32(255,255,255,20), 0.001f);
+				Lines.Add(at+V.XY0(-Text.SizeLayout(label, style).x*textScale - 0.002f, 0), at + V.XY0(-size.x, 0), new Color32(255,255,255,20), 0.001f);
 				Lines.Add(at+V.XY0(0, -size.y), at + V.XY0(-size.x, -size.y), new Color32(255, 255, 255, 20), 0.001f);
 
 				if (calcMin) min = frameMin;

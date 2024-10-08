@@ -71,33 +71,6 @@ namespace StereoKit
 		Stencil,
 	}
 
-	/// <summary>TODO: remove this in v0.4
-	/// This describes the type of display tech used on a Mixed
-	/// Reality device. This will be replaced by `DisplayBlend` in v0.4.</summary>
-	[Flags]
-	public enum Display {
-		/// <summary>Default value, when using this as a search type, it will
-		/// fall back to default behavior which defers to platform
-		/// preference.</summary>
-		None         = 0,
-		/// <summary>This display is opaque, with no view into the real world!
-		/// This is equivalent to a VR headset, or a PC screen.</summary>
-		Opaque       = 1 << 0,
-		/// <summary>This display is transparent, and adds light on top of
-		/// the real world. This is equivalent to a HoloLens type of device.</summary>
-		Additive     = 1 << 1,
-		/// <summary>This is a physically opaque display, but with a camera
-		/// passthrough displaying the world behind it anyhow. This would be
-		/// like a Varjo XR-1, or phone-camera based AR.</summary>
-		Blend        = 1 << 2,
-		/// <summary>Use Display.Blend instead, to be removed in v0.4</summary>
-		Passthrough  = 1 << 2,
-		/// <summary>This matches either transparent display type! Additive
-		/// or Blend. For use when you just want to see the world behind your
-		/// application.</summary>
-		AnyTransparent = Additive | Blend,
-	}
-
 	/// <summary>This describes the way the display's content blends with
 	/// whatever is behind it. VR headsets are normally Opaque, but some VR
 	/// headsets provide passthrough video, and can support Opaque as well as
@@ -286,6 +259,18 @@ namespace StereoKit
 		/// <summary>This memory is now _yours_ and you must free it yourself! Memory has been
 		/// allocated, and the data has been copied over to it. Pricey! But safe.</summary>
 		Copy,
+	}
+
+	/// <summary>Provides a reason on why StereoKit has quit.</summary>
+	public enum QuitReason {
+		/// <summary>Default state when SK has not quit.</summary>
+		None,
+		/// <summary>User has selected to quit the application using application controls.</summary>
+		User,
+		/// <summary>Runtime Error SESSION_LOST</summary>
+		SessionLost,
+		/// <summary>User has closed the application from outside of the application.</summary>
+		SystemClose,
 	}
 
 	/// <summary>What type of user motion is the device capable of tracking? For the normal
@@ -534,14 +519,24 @@ namespace StereoKit
 		/// can be used as input to important Mixed Reality features like
 		/// Late Stage Reprojection that'll make your view more stable!</summary>
 		None         = 1,
+		/// <summary>Also known as Alpha To Coverage, this mode uses MSAA samples to
+		/// create transparency. This works with a z-buffer and therefore
+		/// functionally behaves more like an opaque material, but has a
+		/// quantized number of "transparent values" it supports rather than
+		/// a full range of  0-255 or 0-1. For 4x MSAA, this will give only
+		/// 4 different transparent values, 8x MSAA only 8, etc.
+		/// From a performance perspective, MSAA usually is only costly
+		/// around triangle edges, but using this mode, MSAA is used for the
+		/// whole triangle.</summary>
+		MSAA         = 2,
 		/// <summary>This will blend with the pixels behind it. This is 
 		/// transparent! You may not want to write to the z-buffer, and it's
 		/// slower than opaque materials.</summary>
-		Blend,
+		Blend        = 3,
 		/// <summary>This will straight up add the pixel color to the color
 		/// buffer! This usually looks -really- glowy, so it makes for good
 		/// particles or lighting effects.</summary>
-		Add,
+		Add          = 4,
 	}
 
 	/// <summary>Depth test describes how this material looks at and responds
@@ -609,11 +604,6 @@ namespace StereoKit
 		Vector3      = 4,
 		/// <summary>A 4 component vector composed of floating point values.</summary>
 		Vector4      = 5,
-
-		/// <summary>A 4 component vector composed of floating point values.
-		/// TODO: Remove in v0.4</summary>
-		[Obsolete("Replaced by MaterialParam.Vector4")]
-		Vector       = 5,
 		/// <summary>A 4x4 matrix of floats.</summary>
 		Matrix       = 6,
 		/// <summary>Texture information!</summary>
@@ -641,6 +631,8 @@ namespace StereoKit
 	/// it is given.</summary>
 	[Flags]
 	public enum TextFit {
+		/// <summary>No particularly special behavior.</summary>
+		None         = 0,
 		/// <summary>The text will wrap around to the next line down when it
 		/// reaches the end of the space on the X axis.</summary>
 		Wrap         = 1 << 0,
@@ -701,24 +693,6 @@ namespace StereoKit
 		/// <summary>Start on the right of the X axis, and bottom on the Y
 		/// axis.This is a combination of XRight and YBottom.</summary>
 		BottomRight  = XRight | YBottom,
-	}
-
-	/// <summary>This describes the behavior of a 'Solid' physics object! The
-	/// physics engine will apply forces differently based on this type.</summary>
-	public enum SolidType {
-		/// <summary>This object behaves like a normal physical object, it'll
-		/// fall, get pushed around, and generally be susceptible to physical
-		/// forces! This is a 'Dynamic' body in physics simulation terms.</summary>
-		Normal       = 0,
-		/// <summary>Immovable objects are always stationary! They have
-		/// infinite mass, zero velocity, and can't collide with Immovable of
-		/// Unaffected types.</summary>
-		Immovable,
-		/// <summary>Unaffected objects have infinite mass, but can have a
-		/// velocity! They'll move under their own forces, but nothing in the
-		/// simulation will affect them. They don't collide with Immovable or
-		/// Unaffected types.</summary>
-		Unaffected,
 	}
 
 	/// <summary>Describes how an animation is played back, and what to do when
@@ -787,6 +761,19 @@ namespace StereoKit
 		Ortho        = 1,
 	}
 
+	/// <summary>When used with a hierarchy modifying function that will push/pop items onto a
+	/// stack, this can be used to change the behavior of how parent hierarchy items
+	/// will affect the item being added to the top of the stack.</summary>
+	public enum HierarchyParent {
+		/// <summary>Inheriting is generally the default behavior of a hierarchy stack, the
+		/// current item will inherit the properties of the parent stack item in some
+		/// form or another.</summary>
+		Inherit,
+		/// <summary>Ignoring the parent hierarchy stack item will let you skip inheriting
+		/// anything from the parent item. The new item remains exactly as provided.</summary>
+		Ignore,
+	}
+
 	/// <summary>When opening the Platform.FilePicker, this enum describes
 	/// how the picker should look and behave.</summary>
 	public enum PickerMode {
@@ -803,13 +790,13 @@ namespace StereoKit
 	public enum TextContext {
 		/// <summary>General text editing, this is the most common type of text, and would
 		/// result in a 'standard' keyboard layout.</summary>
-		Text         = 1,
+		Text         = 0,
 		/// <summary>Numbers and numerical values.</summary>
-		Number       = 2,
+		Number       = 1,
 		/// <summary>This text specifically represents some kind of URL/URI address.</summary>
-		Uri          = 10,
+		Uri          = 2,
 		/// <summary>This is a password, and should not be visible when typed!</summary>
-		Password     = 18,
+		Password     = 3,
 	}
 
 	/// <summary>What type of device is the source of the pointer? This is a
@@ -1263,6 +1250,8 @@ namespace StereoKit
 		Solid,
 		/// <summary>An Anchor.</summary>
 		Anchor,
+		/// <summary>A RenderList</summary>
+		RenderList,
 	}
 
 }

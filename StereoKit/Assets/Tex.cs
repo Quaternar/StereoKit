@@ -6,8 +6,9 @@ namespace StereoKit
 {
 	/// <summary>This is the texture asset class! This encapsulates 2D images,
 	/// texture arrays, cubemaps, and rendertargets! It can load any image
-	/// format that stb_image can, (jpg, png, tga, bmp, psd, gif, hdr, pic)
-	/// plus more later on, and you can also create textures procedurally.
+	/// format that stb_image can, (jpg, png, tga, bmp, psd, gif, hdr, pic,
+	/// ktx2) plus more later on, and you can also create textures
+	/// procedurally.
 	/// </summary>
 	public class Tex : IAsset
 	{
@@ -100,6 +101,20 @@ namespace StereoKit
 		/// but subsequent calls will pull from a cached value.</summary>
 		public SphericalHarmonics CubemapLighting => NativeAPI.tex_get_cubemap_lighting(_inst);
 
+		/// <summary>This allows you to attach or retreive a z/depth buffer
+		/// from a rendertarget texture. This texture _must_ be a rendertarget
+		/// to set this, and the zbuffer texture _must_ be a depth format (or
+		/// null). For no-rendertarget textures, this will always be null.
+		/// </summary>
+		public Tex ZBuffer {
+			get {
+				IntPtr result = NativeAPI.tex_get_zbuffer(_inst);
+				return result == IntPtr.Zero
+					? null
+					: new Tex(result);
+			}
+			set => NativeAPI.tex_set_zbuffer(_inst, value._inst == IntPtr.Zero ? IntPtr.Zero : value._inst);
+		}
 		#endregion
 
 		#region Constructors
@@ -257,7 +272,7 @@ namespace StereoKit
 		{
 			if (Format != TexFormat.R32)
 			{
-				Log.Err($"Can't set a {Format} format texture from Color data!", Format);
+				Log.Err($"Can't set a {Format} format texture from Color data!");
 				return;
 			}
 			NativeAPI.tex_set_colors(_inst, width, height, data);
@@ -265,7 +280,7 @@ namespace StereoKit
 
 		/// <summary>Loads an image file stored in memory directly into
 		/// the created texture! Supported formats are: jpg, png, tga,
-		/// bmp, psd, gif, hdr, pic. This method introduces a blocking 
+		/// bmp, psd, gif, hdr, pic, ktx2. This method introduces a blocking
 		/// boolean parameter, which allows you to specify whether this
 		/// method blocks until the image fully loads! The default case
 		/// is to have it as part of the asynchronous asset pipeline, in
@@ -318,7 +333,7 @@ namespace StereoKit
 		/// passed on to StereoKit? If so, StereoKit may delete it when it's
 		/// finished with it. If this is not desired, pass in false.</param>
 		public void SetNativeSurface(IntPtr nativeTexture, TexType type=TexType.Image, long native_fmt=0, int width=0, int height=0, int surface_count=1, bool owned=true)
-			=> NativeAPI.tex_set_surface(_inst, nativeTexture, type, native_fmt, width, height, surface_count, owned);
+			=> NativeAPI.tex_set_surface(_inst, nativeTexture, type, native_fmt, width, height, surface_count, 1, 1, owned);
 
 		/// <summary>This will return the texture's native resource for use
 		/// with external libraries. For D3D, this will be an ID3D11Texture2D*,
@@ -330,28 +345,6 @@ namespace StereoKit
 		/// IntPtr.</returns>
 		public IntPtr GetNativeSurface()
 			=> NativeAPI.tex_get_surface(_inst);
-
-		/// <summary>Retrieve the color data of the texture from the GPU. This
-		/// can be a very slow operation, so use it cautiously. If the color
-		/// array is the correct size, it will not be re-allocated.</summary>
-		/// <param name="colorData">An array of colors that will be filled out
-		/// with the texture's data. It can be null, or an incorrect size. If
-		/// so, it will be reallocated to the correct size.</param>
-		/// <param name="mipLevel">Retrieves the color data for a specific
-		/// mip-mapping level. This function will log a fail and return a black
-		/// array if an invalid mip-level is provided.</param>
-		[Obsolete("Use GetColorData<Color32>")]
-		public void GetColors(ref Color32[] colorData, int mipLevel = 0) => GetColorData(ref colorData, mipLevel);
-
-		/// <summary>Retrieve the color data of the texture from the GPU. This
-		/// can be a very slow operation, so use it cautiously.</summary>
-		/// <param name="mipLevel">Retrieves the color data for a specific
-		/// mip-mapping level. This function will log a fail and return a black
-		/// array if an invalid mip-level is provided.</param>
-		/// <returns>The texture's color values in an array sized Width*Height.
-		/// </returns>
-		[Obsolete("Use GetColorData<Color32>")]
-		public Color32[] GetColors(int mipLevel = 0) => GetColorData<Color32>(mipLevel);
 
 		/// <summary>Retrieve the color data of the texture from the GPU. This
 		/// can be a very slow operation, so use it cautiously.</summary>
@@ -404,7 +397,7 @@ namespace StereoKit
 
 			GCHandle  pinnedArray = GCHandle.Alloc(colorData, GCHandleType.Pinned);
 			IntPtr    pointer     = pinnedArray.AddrOfPinnedObject();
-			NativeAPI.tex_get_data_mip(_inst, pointer, (UIntPtr)(width * height * pixelSize), mipLevel);
+			NativeAPI.tex_get_data(_inst, pointer, (UIntPtr)(width * height * pixelSize), mipLevel);
 			pinnedArray.Free();
 		}
 
@@ -425,8 +418,8 @@ namespace StereoKit
 		/// <param name="depthFormat">The format of the depth texture, must
 		/// be a depth format type!</param>
 		/// <returns>A new Tex asset with the specified depth.</returns>
-		public Tex AddZBuffer(TexFormat depthFormat)
-			=> new Tex(NativeAPI.tex_add_zbuffer(_inst, depthFormat));
+		public void AddZBuffer(TexFormat depthFormat)
+			=> NativeAPI.tex_add_zbuffer(_inst, depthFormat);
 		#endregion
 
 		#region Static Methods
@@ -507,11 +500,11 @@ namespace StereoKit
 		}
 
 		/// <summary>Loads an image file directly into a texture! Supported
-		/// formats are: jpg, png, tga, bmp, psd, gif, hdr, pic. Asset Id
+		/// formats are: jpg, png, tga, bmp, psd, gif, hdr, pic, ktx2. Asset Id
 		/// will be the same as the filename.</summary>
 		/// <param name="file">An absolute filename, or a filename relative
 		/// to the assets folder. Supports jpg, png, tga, bmp, psd, gif, hdr,
-		/// pic</param>
+		/// pic, ktx2.</param>
 		/// <param name="sRGBData">Is this image color data in sRGB format,
 		/// or is it normal/metal/rough/data that's not for direct display?
 		/// sRGB colors get converted to linear color space on the graphics
@@ -532,11 +525,11 @@ namespace StereoKit
 		/// array texture! Array textures are often useful for shader
 		/// effects, layering, material merging, weird stuff, and will
 		/// generally need a specific shader to support it. Supported formats
-		/// are: jpg, png, tga, bmp, psd, gif, hdr, pic. Asset Id will be the
-		/// hash of all the filenames merged consecutively.</summary>
+		/// are: jpg, png, tga, bmp, psd, gif, hdr, pic, ktx2. Asset Id will be
+		/// the hash of all the filenames merged consecutively.</summary>
 		/// <param name="files">Absolute filenames, or a filenames relative
 		/// to the assets folder. Supports jpg, png, tga, bmp, psd, gif, hdr,
-		/// pic</param>
+		/// pic, ktx2.</param>
 		/// <param name="sRGBData">Is this image color data in sRGB format,
 		/// or is it normal/metal/rough/data that's not for direct display?
 		/// sRGB colors get converted to linear color space on the graphics
@@ -554,7 +547,8 @@ namespace StereoKit
 
 		/// <summary>Loads an image file stored in memory directly into a
 		/// texture! Supported formats are: jpg, png, tga, bmp, psd, gif,
-		/// hdr, pic. Asset Id will be the same as the filename.</summary>
+		/// hdr, pic, ktx2. Asset Id will be the same as the filename.
+		/// </summary>
 		/// <param name="imageFileData">The binary data of an image file,
 		/// this is NOT a raw RGB color array!</param>
 		/// <param name="sRGBData">Is this image color data in sRGB format,
@@ -674,6 +668,26 @@ namespace StereoKit
 				Log.Err("To create a cubemap, you must have exactly 6 images!");
 			IntPtr inst = NativeAPI.tex_create_cubemap_files(cubeFaceFiles_xxyyzz, sRGBData, out lightingInfo, priority);
 			return inst == IntPtr.Zero ? null : new Tex(inst);
+		}
+
+		/// <summary>This will assemble a texture ready for rendering to! It
+		/// creates a render target texture with no mip maps and a depth buffer
+		/// attached.</summary>
+		/// <param name="width">Width in pixels.</param>
+		/// <param name="height">Height in pixels</param>
+		/// <param name="multisample">Multisample level, or MSAA. This should
+		/// be 1, 2, 4, 8, or 16. The results will have moother edges with
+		/// higher values, but will cost more RAM and time to render. Note that
+		/// GL platforms cannot trivially draw a multisample > 1 texture in a
+		/// shader.</param>
+		/// <param name="colorFormat">The format of the color surface.</param>
+		/// <param name="depthFormat">The format of the depth buffer. If this
+		/// is None, no depth buffer will be attached to this rendertarget.</param>
+		/// <returns>Returns a texture set up as a rendertarget.</returns>
+		public static Tex RenderTarget(int width, int height, int multisample = 1, TexFormat colorFormat = TexFormat.Rgba32, TexFormat depthFormat = TexFormat.Depth16)
+		{
+			IntPtr tex =  NativeAPI.tex_create_rendertarget(width, height, multisample, colorFormat, depthFormat);
+			return tex == IntPtr.Zero ? null : new Tex(tex);
 		}
 
 		/// <summary>This generates a solid color texture of the given

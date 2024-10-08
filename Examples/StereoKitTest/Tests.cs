@@ -7,8 +7,22 @@ using System.Reflection;
 
 public static class Tests
 {
+	public enum Category
+	{
+		Demo,
+		Test,
+		Documentation,
+		MAX
+	}
+
+	struct TestItem
+	{
+		public Type   type;
+		public string name;
+	}
+
 	static List<Type> allTests  = new List<Type>();
-	static List<Type> demoTests = new List<Type>();
+	static List<TestItem>[] categoryTests = new List<TestItem>[(int)Category.MAX];
 	static ITest activeScene;
 	static ITest nextScene;
 	static int   testIndex  = 0;
@@ -16,10 +30,10 @@ public static class Tests
 	static float runSeconds = 0;
 	static int   sceneFrame = 0;
 	static float sceneTime  = 0;
+	static int   failures   = 0;
 	static HashSet<string> screens = new HashSet<string>();
 
 	private static Type ActiveTest { set { nextScene = (ITest)Activator.CreateInstance(value); } }
-	public  static int  DemoCount => demoTests.Count;
 	public  static bool IsTesting { get; set; }
 	public  static bool TestSingle { get; set; }
 
@@ -32,12 +46,26 @@ public static class Tests
 	{
 		allTests = Assembly.GetExecutingAssembly()
 			.GetTypes()
-			.Where ( a => a != typeof(ITest) && typeof(ITest).IsAssignableFrom(a) )
+			.Where  (a => a != typeof(ITest) && typeof(ITest).IsAssignableFrom(a) )
+			.OrderBy(a => a.Name )
+			.ToList ();
+
+		categoryTests[(int)Category.Demo] = allTests
+			.Where (t => t.Name.StartsWith("Demo"))
+			.Select(t => new TestItem { type = t, name=t.Name.Substring("Demo".Length) })
 			.ToList();
-		demoTests = allTests
-			.Where(a=>a.Name.StartsWith("Demo"))
+		categoryTests[(int)Category.Test] = allTests
+			.Where (t => t.Name.StartsWith("Test"))
+			.Select(t => new TestItem { type = t, name = t.Name.Substring("Test".Length) })
+			.ToList();
+		categoryTests[(int)Category.Documentation] = allTests
+			.Where (t => t.Name.StartsWith("Doc"))
+			.Select(t => new TestItem { type = t, name = t.Name.Substring("Doc".Length) })
 			.ToList();
 	}
+
+	public static int Count(Category category) => categoryTests[(int)category].Count;
+	public static bool IsActive(Category category, int i) => categoryTests[(int)category][i].type == activeScene.GetType();
 
 	public static void Initialize()
 	{
@@ -47,6 +75,7 @@ public static class Tests
 		if (nextScene == null)
 			nextScene = (ITest)Activator.CreateInstance(allTests[testIndex]);
 	}
+
 	public static void Update()
 	{
 		if (IsTesting && runSeconds != 0)
@@ -71,7 +100,20 @@ public static class Tests
 			activeScene = nextScene;
 			nextScene   = null;
 		}
-		activeScene.Step();
+
+		// If we're testing, catch and log exceptions instead of crashing
+		if (IsTesting)
+		{
+			try { activeScene.Step(); }
+			catch ( Exception e )
+			{
+				Log.Err(e.ToString());
+				failures++;
+				runFrames = sceneFrame + 1; // Ditch out of this test
+			}
+		} else {
+			activeScene.Step();
+		}
 		sceneFrame++;
 
 		if (IsTesting && FinishedWithTest())
@@ -88,18 +130,31 @@ public static class Tests
 		activeScene?.Shutdown();
 		activeScene = null;
 		GC.Collect(int.MaxValue, GCCollectionMode.Forced);
+
+		if (IsTesting) {
+			if (failures != 0)
+			{
+				Log.Warn($"Testing <~RED>FAILED<~clr>: {failures} failures encountered!");
+				Environment.Exit(-1);
+			} else {
+				Log.Info($"Testing <~GRN>passed!<~clr>");
+			}
+		}
+		Log.Info($"Quit reason: <~WHT>{SK.QuitReason}<~clr>");
 	}
 
-	public static string GetDemoName  (int index)
+	public static string GetTestName(Category category, int index)
 	{
-		return demoTests[index].Name;
+		return categoryTests[(int)category][index].name;
 	}
-	public static void   SetDemoActive(int index)
+
+	public static void SetTestActive(Category category, int index)
 	{
-		Log.Write(LogLevel.Info, "Starting Scene: " + demoTests[index].Name);
-		ActiveTest = demoTests[index];
+		Log.Info($"Starting Scene: {categoryTests[(int)category][index].name}");
+		ActiveTest = categoryTests[(int)category][index].type;
 	}
-	public static void   SetTestActive(string name)
+
+	public static void SetTestActive(string name)
 	{
 		name = name.ToLower();
 		Type result = allTests.OrderBy( a => {
@@ -108,19 +163,25 @@ public static class Tests
 			else if (str.Contains(name)) return str.Length - name.Length;
 			else                         return 1000 + string.Compare(str, name);
 		}).First();
-		Log.Write(LogLevel.Info, "Starting Scene: " + result.Name);
+		Log.Info($"Starting Scene: {result.Name}");
 
 		sceneFrame = 0;
 		runFrames  = 2;
 		runSeconds = 0;
 		ActiveTest = result;
 	}
+
 	public static void Test(Func<bool> testFunction)
 	{
-		if (!testFunction())
-		{
-			Log.Err("Test failed for {0}!", testFunction.Method.Name);
-			Environment.Exit(-1);
+		try {
+			if (!testFunction())
+			{
+				Log.Err($"Test failed for {testFunction.Method.Name}!");
+				failures += 1;
+			}
+		} catch (Exception e) {
+			Log.Err($"Test CRASHED for {testFunction.Method.Name}!\n{e.ToString()}");
+			failures += 1;
 		}
 	}
 
@@ -138,6 +199,10 @@ public static class Tests
 		=> runFrames = frames;
 	public static void RunForSeconds(float seconds)
 		=> runSeconds = seconds;
+	public static void RunContinue()
+		=> runFrames += 1;
+	public static void RunStop()
+		=> runFrames = -1;
 
 	public static void Screenshot(string name, int width, int height, float fov, Vec3 from, Vec3 at)
 		=> Screenshot(name, 0, width, height, fov, from, at);

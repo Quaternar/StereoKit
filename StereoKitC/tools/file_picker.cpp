@@ -414,7 +414,7 @@ void file_picker_update() {
 
 		// Show the current directory address bar!
 		vec3    address_bar_start = ui_layout_at();
-		float   max_width         = ui_area_remaining().x;
+		float   max_width         = ui_layout_remaining().x;
 		float   width             = 0;
 		int32_t start             = maxi(0, fp_path.fragments.count - 1);
 
@@ -426,7 +426,7 @@ void file_picker_update() {
 		// That's the fragment we'll start with
 		if (fp_path.fragments.count > 0) {
 			for (int32_t i = start; i >= 0; i--) {
-				float curr_size = fminf(max_width / 4, text_size(fp_path.fragments[i]).x + padding * 2);
+				float curr_size = fminf(max_width / 4, text_size_layout(fp_path.fragments[i]).x + padding * 2);
 				if (width + curr_size > max_width) {
 					break;
 				}
@@ -438,7 +438,7 @@ void file_picker_update() {
 		if (fp_path.fragments.count == 0) ui_layout_reserve(vec2{ max_width, line_height });
 		for (int32_t i = start; i < fp_path.fragments.count; i++) {
 			ui_push_idi(i);
-			vec2 curr_size = { fminf(max_width / 4, text_size(fp_path.fragments[i]).x + padding * 2), line_height };
+			vec2 curr_size = { fminf(max_width / 4, text_size_layout(fp_path.fragments[i]).x + padding * 2), line_height };
 			if (ui_button_sz(fp_path.fragments[i], curr_size) && i < fp_path.fragments.count - 1) {
 				char* new_path = string_copy(fp_path.folder);
 				for (int32_t p = i; p < fp_path.fragments.count - 1; p++)
@@ -478,13 +478,11 @@ void file_picker_update() {
 		case picker_mode_open: {
 			if (ui_button("Cancel")) { fp_call = true; fp_call_status = false; }
 			ui_sameline();
-			if (fp_active == nullptr) ui_push_enabled(false);
+			ui_push_enabled(fp_active != nullptr);
 			if (ui_button("Open")) { snprintf(fp_filename, sizeof(fp_filename), "%s%c%s", fp_path.folder, platform_path_separator_c, fp_active); fp_call = true; fp_call_status = true; }
 			ui_sameline();
-			if (fp_active == nullptr) ui_push_enabled(false);
-			ui_text_sz(fp_active ? fp_active : "None selected...", text_align_center_left, text_fit_squeeze, {0,0});
-			if (fp_active == nullptr) ui_pop_enabled();
-			ui_push_enabled(true);
+			ui_text(fp_active ? fp_active : "None selected...", nullptr, ui_scroll_none, ui_line_height(), text_align_center_left, text_fit_none);
+			ui_pop_enabled();
 		} break;
 		}
 
@@ -559,7 +557,7 @@ void file_picker_update() {
 				if (fp_items[i].file_attr.file) {
 					char buffer[128];
 					snprintf(buffer, sizeof(buffer), "%d KB ", (int32_t)(fp_items[i].file_attr.size / 1024));
-					ui_text_sz(buffer, text_align_center_right, text_fit_clip, { size.x, size.y });
+					ui_text_sz(buffer, nullptr, ui_scroll_none, size, text_align_center_right, text_fit_clip);
 					ui_sameline();
 				} else {
 					ui_layout_reserve(size);

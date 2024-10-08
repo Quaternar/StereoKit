@@ -1,3 +1,9 @@
+/* SPDX-License-Identifier: MIT */
+/* The authors below grant copyright rights under the MIT license:
+ * Copyright (c) 2019-2024 Nick Klingensmith
+ * Copyright (c) 2024 Qualcomm Technologies, Inc.
+ */
+
 #pragma once
 
 #include "../platforms/platform.h"
@@ -44,8 +50,7 @@ typedef struct XR_MAY_ALIAS XrBaseHeader {
 	const void* XR_MAY_ALIAS    next;
 } XrBaseHeader;
 
-#define xr_check(xResult, message) {XrResult xr_call_result = xResult; if (XR_FAILED(xr_call_result)) {log_infof(message, openxr_string(xr_call_result)); return false;}}
-#define xr_check2(xResult, message) {XrResult xr_call_result = xResult; if (XR_FAILED(xr_call_result)) {log_infof("%s [%s]", message, openxr_string(xr_call_result)); return false;}}
+#define xr_check(xResult, message) {XrResult xr_call_result = xResult; if (XR_FAILED(xr_call_result)) {log_infof("%s [%s]", message, openxr_string(xr_call_result)); return false;}}
 inline void xr_insert_next(XrBaseHeader *xr_base, XrBaseHeader *xr_next) { xr_next->next = xr_base->next; xr_base->next = xr_next; }
 
 namespace sk {
@@ -75,10 +80,7 @@ extern XrInstance xr_instance;
 extern XrSession  xr_session;
 extern XrSessionState xr_session_state;
 extern XrSystemId xr_system_id;
-extern bool       xr_has_articulated_hands;
-extern bool       xr_has_hand_meshes;
 extern bool       xr_has_bounds;
-extern bool       xr_has_single_pass;
 extern XrTime     xr_time;
 extern XrTime     xr_eyes_sample_time;
 extern vec2       xr_bounds_size;

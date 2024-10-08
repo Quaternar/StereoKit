@@ -11,10 +11,6 @@ namespace StereoKit
 		private IntPtr _appName;
 		private IntPtr _assetsFolder;
 
-		/// <summary>Which display type should we try to load? Default is 
-		/// `DisplayMode.MixedReality`.</summary>
-		[Obsolete("displayPreference will be removed in v0.4, use SKSettings.mode instead.")]
-		public DisplayMode  displayPreference;
 		/// <summary>Which operation mode should we use for this app? Default
 		/// is XR, and by default the app will fall back to Simulator if XR
 		/// fails or is unavailable.</summary>
@@ -65,11 +61,6 @@ namespace StereoKit
 		/// <summary>If using Runtime.Flatscreen, the pixel size of the
 		/// window on the screen.</summary>
 		public int flatscreenHeight;
-		/// <summary>By default, StereoKit will simulate Mixed Reality input
-		/// so developers can test MR spaces without being in a headset. If
-		/// You don't want this, you can disable it with this setting!</summary>
-		public  bool disableFlatscreenMRSim { get { return _disableFlatscreenMRSim > 0; } set { _disableFlatscreenMRSim = value ? 1 : 0; } }
-		private int _disableFlatscreenMRSim;
 		/// <summary>By default, StereoKit will open a desktop window for
 		/// keyboard input due to lack of XR-native keyboard APIs on many
 		/// platforms. If you don't want this, you can disable it with
@@ -107,7 +98,7 @@ namespace StereoKit
 		public OriginMode origin;
 
 		/// <summary>If StereoKit has nothing to render for this frame, it
-		/// skips submitting a proojection layer to OpenXR entirely.</summary>
+		/// skips submitting a projection layer to OpenXR entirely.</summary>
 		public bool omitEmptyFrames { get { return _omitEmptyFrames > 0; } set { _omitEmptyFrames = value ? 1 : 0; } }
 		private int _omitEmptyFrames;
 
@@ -163,8 +154,6 @@ namespace StereoKit
 	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
 	public struct SystemInfo
 	{
-		/// <summary>The type of display this device has.</summary>
-		public Display displayType;
 		/// <summary>Width of the display surface, in pixels! For a stereo
 		/// display, this will be the width of a single eye.</summary>
 		public int displayWidth;
@@ -210,6 +199,10 @@ namespace StereoKit
 		/// set to true, and World.Raycast can be used.</summary>
 		public bool worldRaycastPresent { get => _worldRaycastPresent > 0; }
 		private int _worldRaycastPresent;
+
+		/// <summary>Obsolete, please use Device.DisplayBlend</summary>
+		[Obsolete("Obsolete, please use Device.DisplayBlend", true)]
+		public DisplayBlend displayType { get => DisplayBlend.None;  set { } }
 	}
 
 	/*[StructLayout(LayoutKind.Sequential)]
@@ -789,6 +782,18 @@ namespace StereoKit
 		Bottom,
 	}
 
+	/// <summary>For UI elements that can be oriented horizontally or
+	/// vertically, this specifies that orientation.</summary>
+	public enum UIDir
+	{
+		/// <summary>The element should be layed out along the horizontal axis.
+		/// </summary>
+		Horizontal,
+		/// <summary>The element should be layed out along the vertical axis.
+		/// </summary>
+		Vertical,
+	}
+
 	/// <summary>For elements that contain corners, this bit flag allows you to
 	/// specify which corners.</summary>
 	public enum UICorner
@@ -813,6 +818,24 @@ namespace StereoKit
 		Left   = TopLeft    | BottomLeft,
 		/// <summary>The top right and bottom right corners.</summary>
 		Right  = TopRight   | BottomRight,
+	}
+
+	/// <summary>This describes how UI elements with scrollable regions scroll
+	/// around or use scroll bars! This allows you to enable or disable
+	/// vertical and horizontal scrolling.</summary>
+	public enum UIScroll
+	{
+		/// <summary>No scroll bars or scrolling.</summary>
+		None       = 0,
+		/// <summary>This will enable vertical scroll bars or scrolling.
+		/// </summary>
+		Vertical   = 1 << 0,
+		/// <summary>This will enable horizontal scroll bars or scrolling.
+		/// </summary>
+		Horizontal = 1 << 1,
+		/// <summary>This will enable both vertical and horizontal scroll bars
+		/// or scrolling.</summary>
+		Both = Vertical | Horizontal,
 	}
 
 	/// <summary>A point on a lathe for a mesh generation algorithm. This is the
@@ -867,5 +890,24 @@ namespace StereoKit
 		/// <returns>Hash code of the id.</returns>
 		public override int GetHashCode()
 			=> id.GetHashCode();
+	}
+
+	[StructLayout(LayoutKind.Sequential)]
+	public struct IdHash
+	{
+		ulong hash;
+
+		public static implicit operator ulong(IdHash h) => h.hash;
+		public static implicit operator IdHash(ulong h) => new IdHash{ hash = h };
+	}
+
+	[StructLayout(LayoutKind.Sequential)]
+	public struct UISliderData
+	{
+		public Vec2     buttonCenter;
+		public float    fingerOffset;
+		public BtnState focusState;
+		public BtnState activeState;
+		public int      interactor;
 	}
 }

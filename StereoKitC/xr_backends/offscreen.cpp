@@ -12,7 +12,6 @@
 #include "../systems/render.h"
 #include "../systems/render_pipeline.h"
 #include "../libraries/stref.h"
-#include "../libraries/sk_gpu.h"
 
 ///////////////////////////////////////////
 
@@ -51,7 +50,7 @@ void offscreen_step_begin() {
 ///////////////////////////////////////////
 
 void offscreen_step_end() {
-	input_update_poses(true);
+	input_step_late();
 
 	render_pipeline_draw();
 }

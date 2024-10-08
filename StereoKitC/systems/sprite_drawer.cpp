@@ -97,12 +97,13 @@ void sprite_drawer_add_at(sprite_t sprite, matrix at, text_align_ anchor_positio
 	// Check if this one does get batched
 	if (sprite->buffer_index == -1) {
 		// Just plop a quad onto the render queue
-		vec3 offset = vec3_zero;
-		if      (anchor_position & text_align_x_left  ) offset.x = -sprite->aspect/2;
-		else if (anchor_position & text_align_x_right ) offset.x =  sprite->aspect/2;
+		vec3  offset = vec3_zero;
+		float aspect = sprite_get_aspect(sprite);
+		if      (anchor_position & text_align_x_left  ) offset.x = -aspect/2;
+		else if (anchor_position & text_align_x_right ) offset.x = aspect /2;
 		if      (anchor_position & text_align_y_bottom) offset.y =  0.5f;
 		else if (anchor_position & text_align_y_top   ) offset.y = -0.5f;
-		render_add_mesh(sprite_quad, sprite->material, matrix_ts(offset, {sprite->aspect, 1, 1}) * at, { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f });
+		render_add_mesh(sprite_quad, sprite->material, matrix_ts(offset, {aspect, 1, 1}) * at, { color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f });
 		return;
 	} else {
 		log_err("Not implemented");
@@ -123,7 +124,7 @@ bool sprite_drawer_init() {
 		{ vec3{0,-1,0}, vec3{0,0,-1}, vec2{1,1}, color32{255,255,255,255} },
 	};	
 	vind_t inds[6] = { 0,1,2, 0,2,3 };
-	mesh_set_id       (sprite_quad_old, "render/sprite_quad");
+	mesh_set_id       (sprite_quad_old, "sk/render/sprite_quad");
 	mesh_set_keep_data(sprite_quad_old, false);
 	mesh_set_data     (sprite_quad_old, verts, 4, inds, 6, false);
 

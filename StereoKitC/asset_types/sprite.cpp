@@ -27,6 +27,7 @@ struct spritemap_t {
 int32_t      sprite_index     = 0;
 spritemap_t *sprite_maps      = nullptr;
 int32_t      sprite_map_count = 0;
+bool         sprite_warning   = false;
 
 ///////////////////////////////////////////
 
@@ -43,6 +44,11 @@ sprite_t sprite_find(const char* id) {
 
 void sprite_set_id(sprite_t sprite, const char *id) {
 	assets_set_id(&sprite->header, id);
+	if (sprite->buffer_index == -1 && sprite->material != nullptr) {
+		char mat_id[128];
+		snprintf(mat_id, sizeof(mat_id), "%s/material", id);
+		material_set_id(sprite->material, mat_id);
+	}
 }
 
 ///////////////////////////////////////////
@@ -54,11 +60,8 @@ const char* sprite_get_id(const sprite_t sprite) {
 ///////////////////////////////////////////
 
 material_t sprite_create_material(int index_id) {
-	char id[64];
-	snprintf(id, sizeof(id), "render/sprite_mat_%d", index_id);
 	shader_t   shader = shader_find(default_id_shader_unlit_clip);
 	material_t result = material_create(shader);
-	material_set_id          (result, id);
 	material_set_transparency(result, transparency_blend);
 	material_set_cull        (result, cull_none);
 	material_set_depth_test  (result, depth_test_less_or_eq);
@@ -71,7 +74,10 @@ material_t sprite_create_material(int index_id) {
 
 sprite_t sprite_create(tex_t image, sprite_type_ type, const char *atlas_id) {
 	if (type == sprite_type_atlased) {
-		log_diag("sprite_create: Atlased sprites not implemented yet! Switching to single.");
+		if (sprite_warning == false) {
+			sprite_warning = true;
+			log_diag("sprite_create: Atlased sprites not implemented yet! All atlased sprites will be switched to single.");
+		}
 		type = sprite_type_single;
 	}
 
@@ -79,9 +85,9 @@ sprite_t sprite_create(tex_t image, sprite_type_ type, const char *atlas_id) {
 	const char* image_id = tex_get_id(image);
 	char sprite_id[256];
 	if (type == sprite_type_single) {
-		snprintf(sprite_id, sizeof(sprite_id), "%s/spr", image_id);
+		snprintf(sprite_id, sizeof(sprite_id), "%s/sprite", image_id);
 	} else {
-		snprintf(sprite_id, sizeof(sprite_id), "atlas_spr/%s/%s", atlas_id, image_id);
+		snprintf(sprite_id, sizeof(sprite_id), "%s/sprite/atlas/%s", image_id, atlas_id);
 	}
 	// Check if the id already exists
 	sprite_t result = sprite_find(sprite_id);
@@ -96,11 +102,6 @@ sprite_t sprite_create(tex_t image, sprite_type_ type, const char *atlas_id) {
 	result->texture = image;
 	result->uvs[0] = vec2{ 0,0 };
 	result->uvs[1] = vec2{ 1,1 };
-	result->aspect = tex_get_width(image) / (float)tex_get_height(image);
-	if (result->aspect > 1) // Width is larger than height
-		result->dimensions_normalized = { 1, 1.f / result->aspect };
-	else                    // Height is larger than, or equal to width
-		result->dimensions_normalized = { result->aspect, 1 };
 
 	if (type == sprite_type_single) {
 		result->size         = 1;
@@ -177,7 +178,7 @@ void sprite_release(sprite_t sprite) {
 ///////////////////////////////////////////
 
 float sprite_get_aspect(sprite_t sprite) {
-	return sprite->aspect;
+	return tex_get_width(sprite->texture) / (float)tex_get_height(sprite->texture);
 }
 
 ///////////////////////////////////////////
@@ -195,7 +196,10 @@ int32_t sprite_get_height(sprite_t sprite) {
 ///////////////////////////////////////////
 
 vec2 sprite_get_dimensions_normalized(sprite_t sprite) {
-	return sprite->dimensions_normalized;
+	float aspect = sprite_get_aspect(sprite);
+	return aspect > 1
+		? vec2{ 1, 1.0f / aspect }
+		: vec2{ aspect, 1 };
 }
 
 ///////////////////////////////////////////
@@ -208,13 +212,7 @@ void sprite_destroy(sprite_t sprite) {
 
 ///////////////////////////////////////////
 
-void sprite_draw(sprite_t sprite, const matrix &transform, color32 color) {
-	sprite_drawer_add(sprite, transform, color);
-}
-
-///////////////////////////////////////////
-
-void sprite_draw_at(sprite_t sprite, matrix transform, text_align_ anchor_position, color32 color) {
+void sprite_draw(sprite_t sprite, matrix transform, text_align_ anchor_position, color32 color) {
 	sprite_drawer_add_at(sprite, transform, anchor_position, color);
 }
 

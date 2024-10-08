@@ -73,10 +73,20 @@ namespace StereoKit
 		/// of the recommended size. Note that the final resolution may also be
 		/// clamped or quantized. Only works in XR mode. If known in advance,
 		/// set this via SKSettings in initialization. This is a _very_ costly
-		/// change to make.</summary>
+		/// change to make. Consider if ViewportScaling will work for you
+		/// instead, and prefer that.</summary>
 		public static float Scaling {
 			get => NativeAPI.render_get_scaling();
 			set => NativeAPI.render_set_scaling(value);
+		}
+
+		/// <summary>This allows you to trivially scale down the area of the
+		/// swapchain that StereoKit renders to! This can be used to boost
+		/// performance in situations where full resolution is not needed, or
+		/// to reduce GPU time. This value is locked to the 0-1 range.</summary>
+		public static float ViewportScaling {
+			get => NativeAPI.render_get_viewport_scaling();
+			set => NativeAPI.render_set_viewport_scaling(value);
 		}
 
 		/// <summary>Allows you to set the multisample (MSAA) level of the
@@ -279,23 +289,6 @@ namespace StereoKit
 		/// resolution the same size as the screen's surface. It'll be saved as
 		/// a JPEG or PNG file depending on the filename extension provided.
 		/// </summary>
-		/// <param name="from">Viewpoint location.</param>
-		/// <param name="at">Direction the viewpoint is looking at.</param>
-		/// <param name="width">Size of the screenshot horizontally, in pixels.</param>
-		/// <param name="height">Size of the screenshot vertically, in pixels.</param>
-		/// <param name="filename">Filename to write the screenshot to! This
-		/// will be a PNG if the extension ends with (case insensitive)
-		/// ".png", and will be a 90 quality JPEG if it ends with anything
-		/// else.</param>
-		[Obsolete("For removal in v0.4. Use the overload that takes filename first.")]
-		public static void Screenshot(Vec3 from, Vec3 at, int width, int height, string filename)
-			=> NativeAPI.render_screenshot_pose(NativeHelper.ToUtf8(filename), 90, Pose.LookAt(from, at), width, height, 90);
-
-		/// <summary>Schedules a screenshot for the end of the frame! The view
-		/// will be rendered from the given position at the given point, with a
-		/// resolution the same size as the screen's surface. It'll be saved as
-		/// a JPEG or PNG file depending on the filename extension provided.
-		/// </summary>
 		/// <param name="filename">Filename to write the screenshot to! This
 		/// will be a PNG if the extension ends with (case insensitive)
 		/// ".png", and will be a 90 quality JPEG if it ends with anything
@@ -309,7 +302,7 @@ namespace StereoKit
 		/// <param name="fieldOfViewDegrees">The angle of the viewport, in 
 		/// degrees.</param>
 		public static void Screenshot(string filename, Vec3 from, Vec3 at, int width, int height, float fieldOfViewDegrees = 90)
-			=> NativeAPI.render_screenshot_pose(NativeHelper.ToUtf8(filename), 90, Pose.LookAt(from, at), width, height, fieldOfViewDegrees);
+			=> NativeAPI.render_screenshot(NativeHelper.ToUtf8(filename), 90, Pose.LookAt(from, at), width, height, fieldOfViewDegrees);
 
 		/// <summary>Schedules a screenshot for the end of the frame! The view
 		/// will be rendered from the given pose, with a resolution the same
@@ -329,7 +322,7 @@ namespace StereoKit
 		/// <param name="fieldOfViewDegrees">The angle of the viewport, in 
 		/// degrees.</param>
 		public static void Screenshot(string filename, int fileQuality, Pose viewpoint, int width, int height, float fieldOfViewDegrees = 90)
-			=> NativeAPI.render_screenshot_pose(NativeHelper.ToUtf8(filename), fileQuality, viewpoint, width, height, fieldOfViewDegrees);
+			=> NativeAPI.render_screenshot(NativeHelper.ToUtf8(filename), fileQuality, viewpoint, width, height, fieldOfViewDegrees);
 
 		/// <summary>Schedules a screenshot for the end of the frame! The view
 		/// will be rendered from the given pose, with a resolution the same
@@ -347,7 +340,7 @@ namespace StereoKit
 		/// <param name="fieldOfViewDegrees">The angle of the viewport, in 
 		/// degrees.</param>
 		public static void Screenshot(string filename, Pose viewpoint, int width, int height, float fieldOfViewDegrees = 90)
-			=> NativeAPI.render_screenshot_pose(NativeHelper.ToUtf8(filename), 90, viewpoint, width, height, fieldOfViewDegrees);
+			=> NativeAPI.render_screenshot(NativeHelper.ToUtf8(filename), 90, viewpoint, width, height, fieldOfViewDegrees);
 
 		/// <summary>Schedules a screenshot for the end of the frame! The view
 		/// will be rendered from the given position at the given point, with a
@@ -446,5 +439,16 @@ namespace StereoKit
 		public static void RenderTo(Tex toRendertarget, Matrix camera, Matrix projection, RenderLayer layerFilter = RenderLayer.All, RenderClear clear = RenderClear.All, Rect viewport = default(Rect))
 			=> NativeAPI.render_to(toRendertarget._inst, camera, projection, layerFilter, clear, viewport);
 
+		/// <summary>This attaches a texture resource globally across all
+		/// shaders. StereoKit uses this to attach the sky cubemap for use in
+		/// reflections across all materials (register 11). It can be used for
+		/// things like shadowmaps, wind data, etc. Prefer a higher registers
+		/// (11+) to prevent conflicting with normal Material textures.</summary>
+		/// <param name="textureRegister">The texture resource register the
+		/// texture will bind to. SK uses register 11 already, so values above
+		/// that should be fine.</param>
+		/// <param name="tex">The texture to assign globally. Setting null here
+		/// will clear any texture that is currently bound.</param>
+		public static void SetGlobalTexture(int textureRegister, Tex tex) => NativeAPI.render_global_texture(textureRegister, tex?._inst ?? IntPtr.Zero);
 	}
 }

@@ -30,50 +30,53 @@ struct ui_theme_color_t {
 
 ///////////////////////////////////////////
 
-font_t          skui_font;
+font_t                    skui_font;
 
-ui_el_visual_t  skui_visuals[ui_vis_max];
+material_t                skui_mat;
+material_t                skui_mat_dbg;
+material_t                skui_font_mat;
 
-material_t      skui_mat;
-material_t      skui_mat_dbg;
-material_t      skui_font_mat;
+sprite_t                  skui_toggle_off;
+sprite_t                  skui_toggle_on;
+sprite_t                  skui_radio_off;
+sprite_t                  skui_radio_on;
+sprite_t                  skui_arrow_left;
+sprite_t                  skui_arrow_right;
+sprite_t                  skui_arrow_up;
+sprite_t                  skui_arrow_down;
+sprite_t                  skui_spr_close;
+sprite_t                  skui_spr_backspace;
+sprite_t                  skui_spr_shift;
+sprite_t                  skui_spr_list;
+sprite_t                  skui_spr_grid;
 
-sprite_t        skui_toggle_off;
-sprite_t        skui_toggle_on;
-sprite_t        skui_radio_off;
-sprite_t        skui_radio_on;
-sprite_t        skui_arrow_left;
-sprite_t        skui_arrow_right;
-sprite_t        skui_arrow_up;
-sprite_t        skui_arrow_down;
-sprite_t        skui_spr_close;
-sprite_t        skui_spr_backspace;
-sprite_t        skui_spr_shift;
-sprite_t        skui_spr_list;
-sprite_t        skui_spr_grid;
+sound_t                   skui_snd_interact;
+sound_t                   skui_snd_uninteract;
+sound_t                   skui_snd_grab;
+sound_t                   skui_snd_ungrab;
+sound_t                   skui_snd_tick;
 
-sound_t         skui_snd_interact;
-sound_t         skui_snd_uninteract;
-sound_t         skui_snd_grab;
-sound_t         skui_snd_ungrab;
-sound_t         skui_snd_tick;
+mesh_t                    skui_box_dbg;
 
-mesh_t          skui_box_dbg;
+id_hash_t                 skui_anim_id[3];
+float                     skui_anim_time[3];
 
-uint64_t        skui_anim_id[3];
-float           skui_anim_time[3];
+color128                  skui_tint;
 
-ui_theme_color_t skui_palette[ui_color_max];
-color128         skui_tint;
+array_t<ui_el_visual_t>   skui_visuals;
+array_t<ui_theme_color_t> skui_palette;
+array_t<text_style_t>     skui_font_stack;
+array_t<color128>         skui_tint_stack;
+array_t<bool32_t>         skui_grab_aura_stack;
 
-array_t<text_style_t> skui_font_stack;
-array_t<color128>     skui_tint_stack;
-array_t<bool32_t>     skui_grab_aura_stack;
+sound_t                   skui_active_sound_off        = nullptr;
+sound_inst_t              skui_active_sound_inst       = {};
+vec3                      skui_active_sound_pos        = vec3_zero;
+id_hash_t                 skui_active_sound_element_id = 0;
 
-sound_t       skui_active_sound_off        = nullptr;
-sound_inst_t  skui_active_sound_inst       = {};
-vec3          skui_active_sound_pos        = vec3_zero;
-uint64_t      skui_active_sound_element_id = 0;
+const float               skui_anim_duration           = 0.2f;
+const float               skui_anim_overshoot          = 10;
+const float               skui_anim_focus_duration     = 0.1f;
 
 ///////////////////////////////////////////
 
@@ -90,8 +93,8 @@ void ui_theming_init() {
 	skui_font_stack      = {};
 	skui_tint_stack      = {};
 	skui_grab_aura_stack = {};
-	memset(skui_visuals,   0, sizeof(skui_visuals));
-	memset(skui_palette,   0, sizeof(skui_palette));
+	skui_visuals.add_empties(ui_vis_max);
+	skui_palette.add_empties(ui_color_max);
 	memset(skui_anim_id,   0, sizeof(skui_anim_id));
 	memset(skui_anim_time, 0, sizeof(skui_anim_time));
 
@@ -100,7 +103,11 @@ void ui_theming_init() {
 	skui_font_mat   = material_find(default_id_material_font);
 	material_set_queue_offset(skui_font_mat, -12);
 	skui_font       = font_find(default_id_font);
-	skui_font_stack.add(text_make_style_mat(skui_font, 10 * mm2m, skui_font_mat, {1,1,1,1}));
+	text_style_t style = text_make_style_mat(skui_font, 0.01f, skui_font_mat, { 1,1,1,1 });
+	// TODO: v0.4, switch these to something more intentional instead of backwards compatible (like lineheight 1.4)
+	// This matches the original SK size for compat, for now.
+	text_style_set_line_height_pct(style, 1.1f);
+	skui_font_stack.add(style);
 
 	// TODO: v0.4, this sets up default values when zeroed out, with a
 	// ui_get_settings, this isn't really necessary anymore!
@@ -268,13 +275,15 @@ void ui_theming_shutdown() {
 	skui_tint_stack     .free();
 	skui_grab_aura_stack.free();
 
-	for (int32_t i = 0; i < ui_vis_max; i++) {
+	for (int32_t i = 0; i < skui_visuals.count; i++) {
 		mesh_release    (skui_visuals[i].mesh);
 		material_release(skui_visuals[i].material);
 		sound_release   (skui_visuals[i].snd_activate);
 		sound_release   (skui_visuals[i].snd_deactivate);
 		skui_visuals[i] = {};
 	}
+	skui_visuals.free();
+	skui_palette.free();
 
 	ui_theme_visuals_release();
 
@@ -314,11 +323,8 @@ void ui_theming_update() {
 	if (skui_active_sound_element_id == 0) return;
 
 	// See if our current sound on/off pair is still from a valid ui element
-	for (int32_t i = 0; i < handed_max; i++) {
-		if (skui_hand[i].active_prev == skui_active_sound_element_id) {
-			return;
-		}
-	}
+	if (ui_id_active(skui_active_sound_element_id))
+		return;
 	// If the "on" sound instance is still playing, we don't want to stomp on
 	// it with the off sound
 	if (sound_inst_is_playing(skui_active_sound_inst))
@@ -339,6 +345,7 @@ void ui_theming_update() {
 ///////////////////////////////////////////
 
 void ui_set_element_visual(ui_vis_ element_visual, mesh_t mesh, material_t material, vec2 min_size) {
+	if (element_visual >= skui_visuals.count) skui_visuals.add_empties(element_visual + 1 - skui_visuals.count);
 	ui_el_visual_t *vis = &skui_visuals[element_visual];
 
 	if (mesh          != nullptr) mesh_addref     (mesh);
@@ -354,12 +361,17 @@ void ui_set_element_visual(ui_vis_ element_visual, mesh_t mesh, material_t mater
 ///////////////////////////////////////////
 
 void ui_set_element_color(ui_vis_ element, ui_color_ color_category) {
+	if (element        >= skui_visuals.count) skui_visuals.add_empties(element        + 1 - skui_visuals.count);
+	if (color_category >= skui_palette.count) skui_palette.add_empties(color_category + 1 - skui_palette.count);
+
 	skui_visuals[element].color_category = color_category;
 }
 
 ///////////////////////////////////////////
 
 void ui_set_element_sound(ui_vis_ element, sound_t activate, sound_t deactivate) {
+	if (element >= skui_visuals.count) skui_visuals.add_empties(element + 1 - skui_visuals.count);
+
 	if (activate   != nullptr) sound_addref(activate);
 	if (deactivate != nullptr) sound_addref(deactivate);
 	if (skui_visuals[element].snd_activate   != nullptr) sound_release(skui_visuals[element].snd_activate);
@@ -372,7 +384,7 @@ void ui_set_element_sound(ui_vis_ element, sound_t activate, sound_t deactivate)
 ///////////////////////////////////////////
 
 mesh_t ui_get_mesh(ui_vis_ element_visual) {
-	return skui_visuals[element_visual].mesh
+	return element_visual < skui_visuals.count && skui_visuals[element_visual].mesh
 		? skui_visuals[element_visual].mesh
 		: skui_visuals[ui_vis_default].mesh;
 }
@@ -380,7 +392,7 @@ mesh_t ui_get_mesh(ui_vis_ element_visual) {
 ///////////////////////////////////////////
 
 vec2 ui_get_mesh_minsize(ui_vis_ element_visual) {
-	return skui_visuals[element_visual].mesh
+	return element_visual < skui_visuals.count && skui_visuals[element_visual].mesh
 		? skui_visuals[element_visual].min_size
 		: skui_visuals[ui_vis_default].min_size;
 }
@@ -388,7 +400,7 @@ vec2 ui_get_mesh_minsize(ui_vis_ element_visual) {
 ///////////////////////////////////////////
 
 material_t ui_get_material(ui_vis_ element_visual) {
-	return skui_visuals[element_visual].material
+	return element_visual < skui_visuals.count && skui_visuals[element_visual].material
 		? skui_visuals[element_visual].material
 		: skui_visuals[ui_vis_default].material;
 }
@@ -396,16 +408,15 @@ material_t ui_get_material(ui_vis_ element_visual) {
 ///////////////////////////////////////////
 
 ui_color_ ui_get_color(ui_vis_ element_visual) {
-	ui_color_ category = skui_visuals[element_visual].color_category;
-	return category != ui_color_none
-		? category
+	return element_visual < skui_visuals.count && skui_visuals[element_visual].color_category != ui_color_none
+		? skui_visuals[element_visual].color_category
 		: skui_visuals[ui_vis_default].color_category;
 }
 
 ///////////////////////////////////////////
 
 sound_t ui_get_sound_on(ui_vis_ element_visual) {
-	return skui_visuals[element_visual].snd_activate
+	return element_visual < skui_visuals.count && skui_visuals[element_visual].snd_activate
 		? skui_visuals[element_visual].snd_activate
 		: skui_visuals[ui_vis_default].snd_activate;
 }
@@ -413,14 +424,14 @@ sound_t ui_get_sound_on(ui_vis_ element_visual) {
 ///////////////////////////////////////////
 
 sound_t ui_get_sound_off(ui_vis_ element_visual) {
-	return skui_visuals[element_visual].snd_deactivate
+	return element_visual < skui_visuals.count && skui_visuals[element_visual].snd_deactivate
 		? skui_visuals[element_visual].snd_deactivate
 		: skui_visuals[ui_vis_default].snd_deactivate;
 }
 
 ///////////////////////////////////////////
 
-color128 ui_get_el_color(ui_vis_ element_visual, float focus) {
+color128 ui_get_element_color(ui_vis_ element_visual, float focus) {
 	ui_color_ color       = ui_get_color(element_visual);
 	color128  final_color = ui_is_enabled()
 		? color_lerp(skui_palette[color].normal, skui_palette[color].active, focus)
@@ -433,7 +444,7 @@ color128 ui_get_el_color(ui_vis_ element_visual, float focus) {
 
 ///////////////////////////////////////////
 
-void ui_draw_el_color(ui_vis_ element_visual, ui_vis_ element_color, vec3 start, vec3 size, float focus) {
+void ui_draw_element_color(ui_vis_ element_visual, ui_vis_ element_color, vec3 start, vec3 size, float focus) {
 	/*if (size.x < skui_box_min.x) size.x = skui_box_min.x;
 	if (size.y < skui_box_min.y) size.y = skui_box_min.y;
 	if (size.z < skui_box_min.z) size.z = skui_box_min.z;*/
@@ -442,22 +453,22 @@ void ui_draw_el_color(ui_vis_ element_visual, ui_vis_ element_color, vec3 start,
 		ui_get_mesh    (element_visual),
 		ui_get_material(element_visual),
 		matrix_ts(start - size / 2, size),
-		ui_get_el_color(element_color, focus));
+		ui_get_element_color(element_color, focus));
 }
 
 ///////////////////////////////////////////
 
-void ui_draw_el(ui_vis_ element_visual, vec3 start, vec3 size, float focus) {
+void ui_draw_element(ui_vis_ element_visual, vec3 start, vec3 size, float focus) {
 	render_add_mesh(
 		ui_get_mesh    (element_visual),
 		ui_get_material(element_visual),
 		matrix_ts(start - size / 2, size),
-		ui_get_el_color(element_visual, focus));
+		ui_get_element_color(element_visual, focus));
 }
 
 ///////////////////////////////////////////
 
-void ui_play_sound_on_off(ui_vis_ element_visual, uint64_t element_id, vec3 at) {
+void ui_play_sound_on_off(ui_vis_ element_visual, id_hash_t element_id, vec3 at) {
 	sound_t snd_on  = ui_get_sound_on(element_visual);
 	sound_t snd_off = ui_get_sound_off(element_visual);
 
@@ -536,6 +547,8 @@ void ui_set_color(color128 color) {
 ///////////////////////////////////////////
 
 void ui_set_theme_color_state(ui_color_ color_type, ui_color_state_ state, color128 color_gamma) {
+	if (color_type >= skui_palette.count) skui_palette.add_empties(color_type + 1 - skui_palette.count);
+
 	color128 linear = color_to_linear(color_gamma);
 
 	switch (state) {
@@ -548,6 +561,8 @@ void ui_set_theme_color_state(ui_color_ color_type, ui_color_state_ state, color
 ///////////////////////////////////////////
 
 color128 ui_get_theme_color_state(ui_color_ color_type, ui_color_state_ state) {
+	if (color_type >= skui_palette.count) color_type = ui_color_none;
+
 	switch (state) {
 	case ui_color_state_normal:   return color_to_gamma(skui_palette[color_type].normal);
 	case ui_color_state_active:   return color_to_gamma(skui_palette[color_type].active);
@@ -559,6 +574,8 @@ color128 ui_get_theme_color_state(ui_color_ color_type, ui_color_state_ state) {
 ///////////////////////////////////////////
 
 void ui_set_theme_color(ui_color_ color_type, color128 color_gamma) {
+	if (color_type >= skui_palette.count) skui_palette.add_empties(color_type + 1 - skui_palette.count);
+
 	color128 linear = color_to_linear(color_gamma);
 	skui_palette[color_type].normal   = linear;
 	skui_palette[color_type].active   = linear*color128{ 2,2,2,1 };
@@ -568,6 +585,8 @@ void ui_set_theme_color(ui_color_ color_type, color128 color_gamma) {
 ///////////////////////////////////////////
 
 color128 ui_get_theme_color(ui_color_ color_type) {
+	if (color_type >= skui_palette.count) color_type = ui_color_none;
+
 	return color_to_gamma(skui_palette[color_type].normal);
 }
 
@@ -641,7 +660,7 @@ void ui_pop_tint() {
 // Animation                             //
 ///////////////////////////////////////////
 
-void ui_anim_start(uint64_t id, int32_t channel) {
+void ui_anim_start(id_hash_t id, int32_t channel) {
 	if (skui_anim_id[channel] != id) {
 		skui_anim_id[channel] = id;
 		skui_anim_time[channel] = time_totalf_unscaled();
@@ -650,7 +669,16 @@ void ui_anim_start(uint64_t id, int32_t channel) {
 
 ///////////////////////////////////////////
 
-bool ui_anim_has(uint64_t id, int32_t channel, float duration) {
+void ui_anim_cancel(id_hash_t id, int32_t channel) {
+	if (skui_anim_id[channel] == id) {
+		skui_anim_id[channel] = 0;
+		skui_anim_time[channel] = 0;
+	}
+}
+
+///////////////////////////////////////////
+
+bool ui_anim_has(id_hash_t id, int32_t channel, float duration) {
 	if (id == skui_anim_id[channel]) {
 		if ((time_totalf_unscaled() - skui_anim_time[channel]) < duration)
 			return true;
@@ -661,8 +689,47 @@ bool ui_anim_has(uint64_t id, int32_t channel, float duration) {
 
 ///////////////////////////////////////////
 
-float ui_anim_elapsed(uint64_t id, int32_t channel, float duration, float max) {
+float ui_anim_elapsed(id_hash_t id, int32_t channel, float duration, float max) {
 	return skui_anim_id[channel] == id ? fminf(max, (time_totalf_unscaled() - skui_anim_time[channel]) / duration) : 0;
+}
+
+///////////////////////////////////////////
+
+float ui_anim_elapsed_total(id_hash_t id, int32_t channel) {
+	return skui_anim_id[channel] == id ? (time_totalf_unscaled() - skui_anim_time[channel]) : 0;
+}
+
+///////////////////////////////////////////
+
+float ui_get_anim_focus(id_hash_t id, button_state_ focus_state, button_state_ activation_state) {
+	if (activation_state & button_state_just_active)
+		ui_anim_start(id, 0);
+	float anim = activation_state & button_state_active ? 1.0f : 0.0f;
+	if (ui_anim_has(id, 0, skui_anim_duration)) {
+		float t = ui_anim_elapsed(id, 0, skui_anim_duration);
+		anim = math_ease_overshoot(0, 1, skui_anim_overshoot, t);
+	}
+	return fmaxf(anim, (focus_state & button_state_active) * 0.5f); // !! This assumes button_state_active == 1 !!
+}
+
+///////////////////////////////////////////
+
+float ui_get_anim_focus_inout(id_hash_t id, button_state_ activation_state) {
+	const float delay = 0.2f;
+	if (activation_state & button_state_just_active) ui_anim_start(id, 0);
+	if (activation_state & button_state_just_inactive) {
+		float elapsed = ui_anim_elapsed_total(id, 0);
+		if (elapsed > delay || elapsed == 0) ui_anim_start(id, 1);
+		ui_anim_cancel(id, 0);
+	}
+
+	float anim = activation_state & button_state_active ? 1.0f : 0.0f;
+	if (ui_anim_has(id, 0, delay + skui_anim_focus_duration)) {
+		anim = math_ease_smooth(0, 1, math_clamp((ui_anim_elapsed_total(id, 0)-delay)/ skui_anim_focus_duration, 0, 1));
+	} else if (ui_anim_has(id, 1, skui_anim_focus_duration)) {
+		anim = math_ease_smooth(1, 0, ui_anim_elapsed(id, 1, skui_anim_focus_duration));
+	}
+	return anim;
 }
 
 ///////////////////////////////////////////
@@ -795,7 +862,7 @@ uint32_t _lathe_corner_root_index(uint32_t corner, ui_corner_ rounded_corners, u
 
 ///////////////////////////////////////////
 
-void _ui_gen_quadrant_mesh(mesh_t *mesh, ui_corner_ rounded_corners, float corner_radius, uint32_t corner_resolution, bool32_t delete_flat_sides, const ui_lathe_pt_t* lathe_pts, int32_t lathe_pt_count) {
+void _ui_gen_quadrant_mesh(mesh_t *mesh, ui_corner_ rounded_corners, float corner_radius, uint32_t corner_resolution, bool32_t delete_flat_sides, bool32_t quadrantified, const ui_lathe_pt_t* lathe_pts, int32_t lathe_pt_count) {
 	float     angle_step = 90 / (float)(corner_resolution - 1);
 	uint32_t  lathe_step = 0;
 	for (size_t i = 0; i < lathe_pt_count; i++)
@@ -818,7 +885,7 @@ void _ui_gen_quadrant_mesh(mesh_t *mesh, ui_corner_ rounded_corners, float corne
 		float u = c == 0 || c == 3 ? 1.f : -1.f;
 		float v = c == 0 || c == 1 ? 1.f : -1.f;
 
-		vec3     offset       = { -u * corner_radius, -v * corner_radius, 0 };
+		vec3     offset       = quadrantified > 0 ? vec3{ -u * corner_radius, -v * corner_radius, 0 } : vec3{ 0,0,0 };
 		uint32_t corner_count = corner_resolution;
 		float    angle_start  = c * 90.f;
 		float    curr_radius  = corner_radius;
@@ -933,15 +1000,16 @@ void _ui_gen_quadrant_mesh(mesh_t *mesh, ui_corner_ rounded_corners, float corne
 
 ///////////////////////////////////////////
 
-mesh_t ui_gen_quadrant_mesh(ui_corner_ rounded_corners, float corner_radius, uint32_t corner_resolution, bool32_t delete_flat_sides, const ui_lathe_pt_t* lathe_pts, int32_t lathe_pt_count) {
+mesh_t ui_gen_quadrant_mesh(ui_corner_ rounded_corners, float corner_radius, uint32_t corner_resolution, bool32_t delete_flat_sides, bool32_t quadrantified, const ui_lathe_pt_t* lathe_pts, int32_t lathe_pt_count) {
 	mesh_t result = nullptr;
-	_ui_gen_quadrant_mesh(&result, rounded_corners, corner_radius, corner_resolution, delete_flat_sides, lathe_pts, lathe_pt_count);
+	_ui_gen_quadrant_mesh(&result, rounded_corners, corner_radius, corner_resolution, delete_flat_sides, quadrantified, lathe_pts, lathe_pt_count);
 	return result;
 }
 
 ///////////////////////////////////////////
 
 mesh_t theme_mesh_button       = nullptr;
+mesh_t theme_mesh_button_round = nullptr;
 mesh_t theme_mesh_input        = nullptr;
 mesh_t theme_mesh_plane        = nullptr;
 mesh_t theme_mesh_panel        = nullptr;
@@ -956,13 +1024,15 @@ mesh_t theme_mesh_separator    = nullptr;
 mesh_t theme_mesh_aura         = nullptr;
 mesh_t theme_mesh_carat        = nullptr;
 
-material_t theme_mat_opaque        = nullptr;
-material_t theme_mat_opaque_same_z = nullptr;
-material_t theme_mat_transparent   = nullptr;
-material_t theme_mat_aura          = nullptr;
-material_t theme_mat_carat         = nullptr;
+material_t theme_mat_opaque          = nullptr;
+material_t theme_mat_opaque_same_z   = nullptr;
+material_t theme_mat_transparent     = nullptr;
+material_t theme_mat_transparent_noq = nullptr;
+material_t theme_mat_aura            = nullptr;
+material_t theme_mat_carat           = nullptr;
 
 void ui_theme_visuals_update() {
+	color32 white_corner = {255,255,255,255};
 	color32 white        = {255,255,255,255};
 	color32 black        = {0,0,0,0};
 	color32 gray         = {200, 200, 200, 255};
@@ -970,8 +1040,8 @@ void ui_theme_visuals_update() {
 	color32 shadow_edge   = {0, 0, 0, 50 };
 	const ui_lathe_pt_t lathe_button[] = {
 		{ {0,    -0.5f},  {0, 1}, white,         true  },
-		{ {0.95f,-0.5f},  {0, 1}, white,         true  },
-		{ {1,    -0.45f}, {1, 0}, white,         true  },
+		{ {1,    -0.5f},  {0, 1}, white,         false },
+		{ {1,    -0.5f},  {1, 0}, white,         true  },
 		{ {1,    -0.1f},  {1, 0}, white,         false },
 		{ {1.2f,  0.49f}, {0, 1}, black,         true, true },
 		{ {0.0f,  0.49f}, {0, 1}, shadow_center, true, true } };
@@ -981,8 +1051,8 @@ void ui_theme_visuals_update() {
 		{ {0.8f, -0.1f }, {-1, 0}, gray,          true  },
 		{ {0.8f, -0.5f }, {-1, 0}, white,         false },
 		{ {0.8f, -0.5f }, { 0, 1}, white,         true  },
-		{ {0.95f,-0.5f }, { 0, 1}, white,         true  },
-		{ {1,    -0.45f}, { 1, 0}, white,         true  },
+		{ {1,    -0.5f }, { 0, 1}, white,         false },
+		{ {1,    -0.5f }, { 1, 0}, white,         true  },
 		{ {1,    -0.1f }, { 1, 0}, white,         false },
 		{ {1.2f,  0.49f}, { 0, 1}, black,         true, true },
 		{ {0,     0.49f}, { 0, 1}, shadow_center, true, true }, };
@@ -1000,37 +1070,41 @@ void ui_theme_visuals_update() {
 		{ {0,    -0.5f},  {0, 1}, white,       true  },
 		{ {1,    -0.5f},  {0, 1}, white,       false },
 		{ {1,    -0.5f},  {1, 0}, white,       true  },
-		{ {1,     0.5f},  {1, 0}, white,       false },
+		{ {1,     0.5f},  {1, 0}, white_corner,false },
 		{ {1,     0.49f}, {0, 1}, shadow_edge, true  },
 		{ {2.0f,  0.49f}, {0, 1}, black,       false } };
 	const ui_lathe_pt_t lathe_slider_btn[] = {
 		{ {0,    -0.5f},  {0, 1}, white,       true  },
 		{ {0.8f, -0.5f},  {0, 1}, white,       true  },
 		{ {1,    -0.4f},  {1, 0}, white,       true  },
-		{ {1,     0.5f},  {1, 0}, white,       false },
+		{ {1,     0.5f},  {1, 0}, white_corner,false },
 		{ {1,     0.49f}, {0, 1}, shadow_edge, true  },
 		{ {2.0f,  0.49f}, {0, 1}, black,       false } };
 
 	bool needs_id = theme_mesh_button == nullptr;
 
-	_ui_gen_quadrant_mesh(&theme_mesh_button,       ui_corner_all,    skui_settings.rounding, 8, false, lathe_button, _countof(lathe_button));
-	_ui_gen_quadrant_mesh(&theme_mesh_input,        ui_corner_all,    skui_settings.rounding, 8, false, lathe_input,  _countof(lathe_input ));
-	_ui_gen_quadrant_mesh(&theme_mesh_plane,        ui_corner_all,    skui_settings.rounding - (skui_settings.margin - skui_settings.gutter), 8, false, lathe_plane, _countof(lathe_plane));
+	float button_rounding = fminf(ui_line_height() * 0.5f, skui_settings.rounding);
+	_ui_gen_quadrant_mesh(&theme_mesh_button_round, ui_corner_all, 0.5f,            8, false, false, lathe_button, _countof(lathe_button));
+	_ui_gen_quadrant_mesh(&theme_mesh_button,       ui_corner_all, button_rounding, 8, false, true,  lathe_button, _countof(lathe_button));
+	_ui_gen_quadrant_mesh(&theme_mesh_input,        ui_corner_all, button_rounding, 8, false, true,  lathe_input,  _countof(lathe_input ));
+	_ui_gen_quadrant_mesh(&theme_mesh_plane,        ui_corner_all, skui_settings.rounding - (skui_settings.margin - skui_settings.gutter), 8, false, true, lathe_plane, _countof(lathe_plane));
+	
+	float panel_rounding = fminf(ui_line_height(), skui_settings.rounding);
+	_ui_gen_quadrant_mesh(&theme_mesh_panel,        ui_corner_all,    panel_rounding, 8, false, true, lathe_panel, _countof(lathe_panel));
+	_ui_gen_quadrant_mesh(&theme_mesh_panel_top,    ui_corner_top,    panel_rounding, 8, true,  true, lathe_panel, _countof(lathe_panel));
+	_ui_gen_quadrant_mesh(&theme_mesh_panel_bot,    ui_corner_bottom, panel_rounding, 8, true,  true, lathe_panel, _countof(lathe_panel));
 
-	_ui_gen_quadrant_mesh(&theme_mesh_panel,        ui_corner_all,    skui_settings.rounding, 8, false, lathe_panel, _countof(lathe_panel));
-	_ui_gen_quadrant_mesh(&theme_mesh_panel_top,    ui_corner_top,    skui_settings.rounding, 8, true,  lathe_panel, _countof(lathe_panel));
-	_ui_gen_quadrant_mesh(&theme_mesh_panel_bot,    ui_corner_bottom, skui_settings.rounding, 8, true,  lathe_panel, _countof(lathe_panel));
+	float slider_rounding = fminf(fmaxf(skui_settings.padding, ui_line_height() / 6.f) / 2.f, skui_settings.rounding * 0.65f);
+	_ui_gen_quadrant_mesh(&theme_mesh_slider,       ui_corner_all,   slider_rounding, 5, false, true, lathe_slider, _countof(lathe_slider));
+	_ui_gen_quadrant_mesh(&theme_mesh_slider_left,  ui_corner_left,  slider_rounding, 5, true,  true, lathe_slider, _countof(lathe_slider));
+	_ui_gen_quadrant_mesh(&theme_mesh_slider_right, ui_corner_right, slider_rounding, 5, true,  true, lathe_slider, _countof(lathe_slider));
 
-	_ui_gen_quadrant_mesh(&theme_mesh_slider,       ui_corner_all,    skui_settings.rounding * 0.35f, 5, false, lathe_slider, _countof(lathe_slider));
-	_ui_gen_quadrant_mesh(&theme_mesh_slider_left,  ui_corner_left,   skui_settings.rounding * 0.35f, 5, true,  lathe_slider, _countof(lathe_slider));
-	_ui_gen_quadrant_mesh(&theme_mesh_slider_right, ui_corner_right,  skui_settings.rounding * 0.35f, 5, true,  lathe_slider, _countof(lathe_slider));
-
-	_ui_gen_quadrant_mesh(&theme_mesh_slider_pinch, ui_corner_all,    skui_settings.rounding * 0.25f, 5, false, lathe_slider_btn, _countof(lathe_slider_btn));
-	_ui_gen_quadrant_mesh(&theme_mesh_slider_push,  ui_corner_all,    skui_settings.rounding * 0.5f,  5, false, lathe_slider_btn, _countof(lathe_slider_btn));
-	_ui_gen_quadrant_mesh(&theme_mesh_separator,    ui_corner_all,    skui_settings.rounding * 0.1f,  3, false, lathe_slider_btn, _countof(lathe_slider_btn));
-
+	_ui_gen_quadrant_mesh(&theme_mesh_slider_pinch, ui_corner_all, fminf((ui_line_height() * 0.5f)/2.f, skui_settings.rounding), 5, false, true, lathe_slider_btn, _countof(lathe_slider_btn));
+	_ui_gen_quadrant_mesh(&theme_mesh_slider_push,  ui_corner_all, fminf((ui_line_height() * 0.55f)/2.f, skui_settings.rounding), 5, false, true, lathe_slider_btn, _countof(lathe_slider_btn));
+	_ui_gen_quadrant_mesh(&theme_mesh_separator,    ui_corner_all, fminf((text_style_get_baseline(ui_get_text_style()) * 0.4f)/2.f, skui_settings.rounding * 0.1f),  3, false, true, lathe_slider, _countof(lathe_slider));
+	
 	float aura_mesh_radius = skui_aura_radius * 0.75f;
-	ui_default_aura_mesh(&theme_mesh_aura, 0, skui_settings.rounding + aura_mesh_radius, skui_aura_radius - aura_mesh_radius, 7, 5);
+	ui_default_aura_mesh(&theme_mesh_aura, 0, fminf(ui_line_height(), skui_settings.rounding) + aura_mesh_radius, skui_aura_radius - aura_mesh_radius, 7, 5);
 
 	if (theme_mesh_carat == nullptr) theme_mesh_carat = mesh_find(default_id_mesh_cube);
 
@@ -1040,6 +1114,12 @@ void ui_theme_visuals_update() {
 		material_set_transparency(theme_mat_transparent, transparency_blend);
 		material_set_depth_test  (theme_mat_transparent, depth_test_less_or_eq);
 		material_set_queue_offset(theme_mat_transparent, -20);
+
+		theme_mat_transparent_noq = material_copy_id(default_id_material_ui);
+		material_set_id          (theme_mat_transparent_noq, "sk/ui/mat_transparent_noq");
+		material_set_transparency(theme_mat_transparent_noq, transparency_blend);
+		material_set_depth_test  (theme_mat_transparent_noq, depth_test_less_or_eq);
+		material_set_queue_offset(theme_mat_transparent_noq, -20);
 
 		theme_mat_opaque = material_copy_id(default_id_material_ui_quadrant);
 		material_set_id          (theme_mat_opaque, "sk/ui/mat_opaque");
@@ -1054,6 +1134,7 @@ void ui_theme_visuals_update() {
 	}
 
 	if (needs_id) {
+		mesh_set_id(theme_mesh_button_round, "sk/ui/mesh_button_round");
 		mesh_set_id(theme_mesh_button,       "sk/ui/mesh_button");
 		mesh_set_id(theme_mesh_input,        "sk/ui/mesh_input");
 		mesh_set_id(theme_mesh_plane,        "sk/ui/mesh_plane");
@@ -1075,7 +1156,7 @@ void ui_theme_visuals_assign() {
 	ui_set_element_visual(ui_vis_default,              theme_mesh_panel,        theme_mat_opaque);
 	ui_set_element_visual(ui_vis_button,               theme_mesh_button,       theme_mat_transparent);
 	ui_set_element_visual(ui_vis_toggle,               theme_mesh_button,       theme_mat_transparent);
-	ui_set_element_visual(ui_vis_button_round,         theme_mesh_button,       theme_mat_transparent);
+	ui_set_element_visual(ui_vis_button_round,         theme_mesh_button_round, theme_mat_transparent_noq);
 	ui_set_element_visual(ui_vis_input,                theme_mesh_input,        theme_mat_transparent);
 	ui_set_element_visual(ui_vis_panel,                theme_mesh_plane,        theme_mat_opaque_same_z);
 	ui_set_element_visual(ui_vis_window_head,          theme_mesh_panel_top,    theme_mat_opaque);
@@ -1095,6 +1176,7 @@ void ui_theme_visuals_assign() {
 ///////////////////////////////////////////
 
 void ui_theme_visuals_release() {
+	mesh_release(theme_mesh_button_round); theme_mesh_button_round  = nullptr;
 	mesh_release(theme_mesh_button      ); theme_mesh_button       = nullptr;
 	mesh_release(theme_mesh_input       ); theme_mesh_input        = nullptr;
 	mesh_release(theme_mesh_plane       ); theme_mesh_plane        = nullptr;
@@ -1110,11 +1192,12 @@ void ui_theme_visuals_release() {
 	mesh_release(theme_mesh_aura        ); theme_mesh_aura         = nullptr;
 	mesh_release(theme_mesh_carat       ); theme_mesh_carat        = nullptr;
 
-	material_release(theme_mat_opaque       ); theme_mat_opaque        = nullptr;
-	material_release(theme_mat_opaque_same_z); theme_mat_opaque_same_z = nullptr;
-	material_release(theme_mat_transparent  ); theme_mat_transparent   = nullptr;
-	material_release(theme_mat_aura         ); theme_mat_aura          = nullptr;
-	material_release(theme_mat_carat        ); theme_mat_carat         = nullptr;
+	material_release(theme_mat_opaque         ); theme_mat_opaque          = nullptr;
+	material_release(theme_mat_opaque_same_z  ); theme_mat_opaque_same_z   = nullptr;
+	material_release(theme_mat_transparent    ); theme_mat_transparent     = nullptr;
+	material_release(theme_mat_transparent_noq); theme_mat_transparent_noq = nullptr;
+	material_release(theme_mat_aura           ); theme_mat_aura            = nullptr;
+	material_release(theme_mat_carat          ); theme_mat_carat           = nullptr;
 }
 
 }
