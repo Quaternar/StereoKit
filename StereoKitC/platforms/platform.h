@@ -15,7 +15,7 @@
 	#define WEB_EXPORT EMSCRIPTEN_KEEPALIVE extern "C"
 #elif defined(__ANDROID__)
 	#define SK_OS_ANDROID
-	//#define SK_XR_OPENXR
+	#define SK_XR_OPENXR
 #elif defined(__linux__)
 	#define SK_OS_LINUX
 	//#define SK_XR_OPENXR

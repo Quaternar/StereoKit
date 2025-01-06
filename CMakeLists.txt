@@ -39,12 +39,13 @@ set(SK_BUILD_SHARED_LIBS            ON  CACHE BOOL "Should StereoKit build as a 
 set(SK_PHYSICS                      ON  CACHE BOOL "Enable physics.")
 set(SK_DYNAMIC_OPENXR               OFF CACHE BOOL "Dynamic link with the standard OpenXR Loader. Not what you want on desktop, but on Android you may need to dynamic link with other loaders.")
 set(FORCE_COLORED_OUTPUT            OFF CACHE BOOL "Always produce ANSI-colored output (GNU/Clang only).")
+set(SK_OPENXR_LOADER_TARGET         "openxr_loader" CACHE STRING "Override name of openxr loader target")
 
 ###########################################
 ## Configuration settings                ##
 ###########################################
 
-# Default build configuration to Release 
+# Default build configuration to Release
 if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
     if (NOT CMAKE_BUILD_TYPE)
         set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
@@ -100,7 +101,7 @@ elseif(EMSCRIPTEN)
   set(SK_PHYSICS OFF)
   set(SK_BUILD_SHARED_LIBS OFF)
   add_definitions("-D_XM_NO_INTRINSICS_")
-  set(SK_LINKER_FLAGS 
+  set(SK_LINKER_FLAGS
     -sFULL_ES3
     -sMIN_WEBGL_VERSION=2
     -sMAX_WEBGL_VERSION=2
@@ -185,8 +186,7 @@ if (SK_BUILD_OPENXR_LOADER)
     "BUILD_WITH_XCB_HEADERS OFF"
     "DYNAMIC_LOADER ${SK_DYNAMIC_OPENXR}"
   )
-  
-  set(OPENXR_LIB openxr_loader)
+  list(APPEND OPENXR_LIB openxr_loader)
 endif()
 
 ###########################################
@@ -338,7 +338,7 @@ set(SK_SRC_SYSTEMS
   StereoKitC/systems/bbox.h
   StereoKitC/systems/bbox.cpp
   StereoKitC/systems/bvh.h
-  StereoKitC/systems/bvh.cpp  
+  StereoKitC/systems/bvh.cpp
   StereoKitC/systems/defaults.h
   StereoKitC/systems/defaults.cpp
   StereoKitC/systems/input.h
@@ -358,7 +358,7 @@ set(SK_SRC_SYSTEMS
   StereoKitC/systems/system.h
   StereoKitC/systems/system.cpp
   StereoKitC/systems/text.h
-  StereoKitC/systems/text.cpp  
+  StereoKitC/systems/text.cpp
   StereoKitC/systems/world.h
   StereoKitC/systems/world.cpp )
 
@@ -484,7 +484,7 @@ if (NOT MSVC)
   endif()
   if (SK_DYNAMIC_OPENXR)
     add_custom_command(TARGET StereoKitC POST_BUILD
-      COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:openxr_loader>
+      COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${SK_OPENXR_LOADER_TARGET}>
     )
   endif()
 else()
@@ -525,9 +525,9 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif()
 
 if (SK_BUILD_OPENXR_LOADER)
-  target_compile_options(openxr_loader PRIVATE ${SK_WARNING_FLAG})
-  target_compile_options(openxr_loader PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_COMPILE}>")
-  target_link_options   (openxr_loader PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_LINK}>")
+  target_compile_options(${SK_OPENXR_LOADER_TARGET} PRIVATE ${SK_WARNING_FLAG})
+  target_compile_options(${SK_OPENXR_LOADER_TARGET} PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_COMPILE}>")
+  target_link_options   (${SK_OPENXR_LOADER_TARGET} PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_LINK}>")
 endif()
 if (SK_PHYSICS)
   target_compile_options(reactphysics3d PRIVATE ${SK_WARNING_FLAG})
@@ -595,7 +595,7 @@ endif()
 if (SK_DYNAMIC_OPENXR)
   add_custom_command(TARGET StereoKitC POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/${SK_DISTRIBUTE_FOLDER}/bin/${SK_BIN_OS}/${SK_ARCH}/$<CONFIG>/standard"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:openxr_loader>" "${CMAKE_CURRENT_SOURCE_DIR}/${SK_DISTRIBUTE_FOLDER}/bin/${SK_BIN_OS}/${SK_ARCH}/$<CONFIG>/standard/$<TARGET_FILE_NAME:openxr_loader>" )
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${SK_OPENXR_LOADER_TARGET}>" "${CMAKE_CURRENT_SOURCE_DIR}/${SK_DISTRIBUTE_FOLDER}/bin/${SK_BIN_OS}/${SK_ARCH}/$<CONFIG>/standard/$<TARGET_FILE_NAME:${SK_OPENXR_LOADER_TARGET}>" )
 endif()
 endif()
 
@@ -678,7 +678,7 @@ if (MSVC AND SK_MULTITHREAD_BUILD_BY_DEFAULT)
   if(SK_PHYSICS)
     target_compile_options(reactphysics3d PRIVATE "/MP")
   endif()
-  target_compile_options(openxr_loader PRIVATE "/MP")
+  target_compile_options(${SK_OPENXR_LOADER_TARGET} PRIVATE "/MP")
   target_compile_options(StereoKitC PRIVATE "/MP")
 endif()
 
@@ -690,7 +690,7 @@ endif()
 # find_package(PkgConfig)
 
 #install(
-#  TARGETS StereoKitC 
+#  TARGETS StereoKitC
 #  EXPORT  StereoKitC-targets
 #)
 #
@@ -699,7 +699,7 @@ endif()
 #  DESTINATION include)
 #
 #install(
-#  FILES       "tools/skshaderc" 
+#  FILES       "tools/skshaderc"
 #  DESTINATION bin)
 #
 #install(
