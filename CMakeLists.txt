@@ -130,7 +130,7 @@ elseif(WIN32)
     DXGI
     D3D11)
     if (MSVC)
-      list(APPEND WINDOWS_LIBS WindowsApp) # Required for ISAC spatial audio code
+      list(APPEND WINDOWS_LIBS Microsoft::CppWinRT mmdevapi) # Required for ISAC spatial audio code
     endif()
 endif()
 
