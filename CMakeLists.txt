@@ -678,7 +678,12 @@ if (MSVC AND SK_MULTITHREAD_BUILD_BY_DEFAULT)
   if(SK_PHYSICS)
     target_compile_options(reactphysics3d PRIVATE "/MP")
   endif()
-  target_compile_options(${SK_OPENXR_LOADER_TARGET} PRIVATE "/MP")
+  
+  get_target_property(is_openxr-loader_imported ${SK_OPENXR_LOADER_TARGET} IMPORTED)
+  if(NOT is_openxr-loader_imported)
+    target_compile_options(${SK_OPENXR_LOADER_TARGET} PRIVATE "/MP")
+    # Your logic here
+  endif()
   target_compile_options(StereoKitC PRIVATE "/MP")
 endif()
 
