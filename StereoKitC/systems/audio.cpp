@@ -353,7 +353,7 @@ bool audio_init() {
 	if (ma_context_init(nullptr, 0, nullptr, &au_context) != MA_SUCCESS) {
 		return false;
 	}
-
+/*
 #if defined(_MSC_VER)
 	if (au_default_device_out_id.wasapi[0] == '\0') {
 		HRESULT hr = isac_activate(_countof(au_active_sounds), isac_data_callback);
@@ -368,6 +368,7 @@ bool audio_init() {
 		}
 	}
 #endif
+*/
 
 	au_config = ma_device_config_init(ma_device_type_playback);
 	au_config.playback.format   = AU_SAMPLE_FORMAT;
