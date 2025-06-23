@@ -420,6 +420,13 @@ bool32_t _ui_handle_begin(uint64_t id, pose_t &handle_pose, bounds_t handle_boun
 								dest_rot = quat_difference(start_2h_rot, dest_rot);
 							} break;
 							case ui_move_pos_only: { dest_rot = quat_identity; } break;
+							case ui_move_exact_no_roll:
+							{
+								dest_rot = quat_lookat(local_pt[0], local_pt[1]);
+								dest_rot = quat_difference(start_2h_rot, dest_rot);
+								dest_rot = quat_lookat(vec3_zero, quat_mul_vec(dest_rot, vec3_forward));
+								break;
+							}
 							default:               { dest_rot = quat_identity; log_err("Unimplemented move type!"); } break;
 							}
 
@@ -463,6 +470,16 @@ bool32_t _ui_handle_begin(uint64_t id, pose_t &handle_pose, bounds_t handle_boun
 							dest_rot = quat_difference(start_handle_rot[i], dest_rot);
 						} break;
 						case ui_move_pos_only: { dest_rot = quat_identity; } break;
+						case ui_move_exact_no_roll:
+							{
+								dest_rot = matrix_transform_quat(to_handle_parent_local, hand->palm.orientation);
+								dest_rot = quat_difference(start_palm_rot[i], dest_rot);
+								dest_rot = quat_lookat(vec3_zero, quat_mul_vec(dest_rot, vec3_forward));
+								/*const float roll_coeff = sqrtf((dest_rot.w * dest_rot.w) + (dest_rot.z * dest_rot.z));
+								const quat opposite_roll = quat{.x = 0.0f, .y = 0.0f, .z = -dest_rot.z, .w = dest_rot.w / roll_coeff};
+								dest_rot = quat_mul(dest_rot, opposite_roll);*/
+								break;
+							}
 						default:               { dest_rot = quat_identity; log_err("Unimplemented move type!"); } break;
 						}
 
