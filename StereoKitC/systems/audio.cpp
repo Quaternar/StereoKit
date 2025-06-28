@@ -6,7 +6,7 @@
 #include "../platforms/platform.h"
 
 #include "../libraries/stref.h"
-#include "../libraries/isac_spatial_sound.h"
+//#include "../libraries/isac_spatial_sound.h"
 
 #include <string.h>
 #include <assert.h>
@@ -205,22 +205,22 @@ ma_uint64 read_data_for_isac(_sound_inst_t& inst, float* output, ma_uint64 frame
 
 ///////////////////////////////////////////
 
-void isac_data_callback(float** sourceBuffers, uint32_t numSources, uint32_t numFrames, vec3* positions, float* volumes) {
-	// Assert on debug builds, eliminate warning on release builds
-	//UNREFERENCED_PARAMETER(numSources);
-	assert(numSources == _countof(au_active_sounds));
-
-	for (uint32_t i = 0; i < _countof(au_active_sounds); i++) {
-		if (au_active_sounds[i].sound == nullptr)
-			continue;
-
-		ma_uint64 framesRead = read_data_for_isac(au_active_sounds[i], sourceBuffers[i], numFrames, &positions[i], &volumes[i]);
-		if (framesRead < numFrames && au_active_sounds[i].sound->type != sound_type_stream) {
-			sound_release(au_active_sounds[i].sound);
-			au_active_sounds[i].sound = nullptr;
-		}
-	}
-}
+//void isac_data_callback(float** sourceBuffers, uint32_t numSources, uint32_t numFrames, vec3* positions, float* volumes) {
+//	// Assert on debug builds, eliminate warning on release builds
+//	//UNREFERENCED_PARAMETER(numSources);
+//	assert(numSources == _countof(au_active_sounds));
+//
+//	for (uint32_t i = 0; i < _countof(au_active_sounds); i++) {
+//		if (au_active_sounds[i].sound == nullptr)
+//			continue;
+//
+//		ma_uint64 framesRead = read_data_for_isac(au_active_sounds[i], sourceBuffers[i], numFrames, &positions[i], &volumes[i]);
+//		if (framesRead < numFrames && au_active_sounds[i].sound->type != sound_type_stream) {
+//			sound_release(au_active_sounds[i].sound);
+//			au_active_sounds[i].sound = nullptr;
+//		}
+//	}
+//}
 
 ///////////////////////////////////////////
 
@@ -445,7 +445,7 @@ void audio_shutdown() {
 
 	mic_stop();
 #if defined(_MSC_VER)
-	isac_destroy();
+	//isac_destroy();
 #endif
 	ma_device_uninit (&au_device);
 	ma_context_uninit(&au_context);

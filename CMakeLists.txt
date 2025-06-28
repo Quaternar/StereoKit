@@ -305,8 +305,8 @@ set(SK_SRC_LIBRARIES
   StereoKitC/libraries/cgltf.cpp
   StereoKitC/libraries/ferr_hash.h
   StereoKitC/libraries/ferr_hash.cpp
-  StereoKitC/libraries/isac_spatial_sound.h
-  StereoKitC/libraries/isac_spatial_sound.cpp
+#  StereoKitC/libraries/isac_spatial_sound.h
+#  StereoKitC/libraries/isac_spatial_sound.cpp
   StereoKitC/libraries/micro_ply.h
   StereoKitC/libraries/miniaudio.h
   StereoKitC/libraries/miniaudio.cpp
