@@ -18,7 +18,7 @@ sk_gpu.h
 // an API appropriate for the platform it's being compiled for!
 //
 //#define SKG_FORCE_DIRECT3D11
-//#define SKG_FORCE_OPENGL
+#define SKG_FORCE_OPENGL
 
 // You can disable use of D3DCompile to make building this easier sometimes,
 // since D3DCompile is primarily used to catch .sks shader files built from
@@ -58,8 +58,8 @@ sk_gpu.h
 			#define _SKG_GL_MAKE_FUNCTIONS
 		#endif
 	#elif defined(_WIN32)
-		#define _SKG_GL_DESKTOP
-		#define _SKG_GL_LOAD_WGL
+		#define _SKG_GL_ES
+		#define _SKG_GL_LOAD_EGL
 		#define _SKG_GL_MAKE_FUNCTIONS
 	#endif
 #endif
