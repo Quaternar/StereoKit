@@ -215,7 +215,7 @@ set(SK_SRC_SHADERS_H
 set(SK_SHADER_COMPILER "${CMAKE_CURRENT_SOURCE_DIR}/tools/skshaderc")
 foreach(SHADER ${SK_SRC_SHADERS_HLSL})
   if (WIN32)
-    set(SK_SHADER_TARGETS "x")
+    set(SK_SHADER_TARGETS "xe")
   elseif(ANDROID)
     set(SK_SHADER_TARGETS "e")
   elseif(EMSCRIPTEN)
