@@ -538,6 +538,10 @@ target_compile_options(StereoKitC PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_COMP
 target_link_options   (StereoKitC PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_LINK}>")
 target_link_options   (StereoKitC PUBLIC ${SK_LINKER_FLAGS})
 
+if (QAR_OPENGL_MIXER)
+  target_compile_definitions(StereoKitC PRIVATE "SKG_FORCE_OPENGL")
+endif()
+
 ###########################################
 ## Copy binaries to the distribute folder##
 ###########################################
