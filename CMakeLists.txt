@@ -40,6 +40,7 @@ set(SK_PHYSICS                      ON  CACHE BOOL "Enable physics.")
 set(SK_DYNAMIC_OPENXR               OFF CACHE BOOL "Dynamic link with the standard OpenXR Loader. Not what you want on desktop, but on Android you may need to dynamic link with other loaders.")
 set(FORCE_COLORED_OUTPUT            OFF CACHE BOOL "Always produce ANSI-colored output (GNU/Clang only).")
 set(SK_OPENXR_LOADER_TARGET         "openxr_loader" CACHE STRING "Override name of openxr loader target")
+set(SK_ENABLE_OPENGL                OFF CACHE BOOL "Force use of OpenGL on all platforms.")
 
 ###########################################
 ## Configuration settings                ##
@@ -538,7 +539,7 @@ target_compile_options(StereoKitC PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_COMP
 target_link_options   (StereoKitC PRIVATE "$<$<CONFIG:RELEASE>:${SK_RELEASE_LINK}>")
 target_link_options   (StereoKitC PUBLIC ${SK_LINKER_FLAGS})
 
-if (QAR_OPENGL_MIXER)
+if (SK_ENABLE_OPENGL)
   target_compile_definitions(StereoKitC PRIVATE "SKG_FORCE_OPENGL")
 endif()
 
