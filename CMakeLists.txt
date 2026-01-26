@@ -476,11 +476,13 @@ if (NOT MSVC)
 
   if (NOT EMSCRIPTEN)
     set(SK_SEPARATE_DBG ON)
-    add_custom_command(TARGET StereoKitC POST_BUILD
-      COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:StereoKitC> $<TARGET_FILE_DIR:StereoKitC>/$<TARGET_FILE_BASE_NAME:StereoKitC>${SK_BIN_DEBUG_EXT}
-      COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:StereoKitC>
-      COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=$<TARGET_FILE_DIR:StereoKitC>/$<TARGET_FILE_BASE_NAME:StereoKitC>${SK_BIN_DEBUG_EXT} $<TARGET_FILE:StereoKitC>
-    )
+    if (SK_BUILD_SHARED_LIBS)
+        add_custom_command(TARGET StereoKitC POST_BUILD
+          COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:StereoKitC> $<TARGET_FILE_DIR:StereoKitC>/$<TARGET_FILE_BASE_NAME:StereoKitC>${SK_BIN_DEBUG_EXT}
+          COMMAND ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:StereoKitC>
+          COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=$<TARGET_FILE_DIR:StereoKitC>/$<TARGET_FILE_BASE_NAME:StereoKitC>${SK_BIN_DEBUG_EXT} $<TARGET_FILE:StereoKitC>
+        )
+    endif()
   endif()
   if (SK_DYNAMIC_OPENXR)
     add_custom_command(TARGET StereoKitC POST_BUILD
