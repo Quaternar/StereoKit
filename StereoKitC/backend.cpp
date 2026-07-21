@@ -215,4 +215,10 @@ void backend_vulkan_queue_unlock(backend_vulkan_queue_ queue) {
 	skr_vk_queue_unlock(backend_vulkan_get_queue_family_index(queue));
 }
 
+///////////////////////////////////////////
+
+void backend_vulkan_ext_request(const char *extension_name) {
+	platform_vulkan_ext_request(extension_name);
+}
+
 }

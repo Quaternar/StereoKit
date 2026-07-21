@@ -3645,6 +3645,7 @@ SK_API void             *backend_vulkan_get_queue              (backend_vulkan_q
 SK_API uint32_t          backend_vulkan_get_queue_family_index (backend_vulkan_queue_ queue);
 SK_API void              backend_vulkan_queue_lock             (backend_vulkan_queue_ queue);
 SK_API void              backend_vulkan_queue_unlock           (backend_vulkan_queue_ queue);
+SK_API void              backend_vulkan_ext_request            (const char *extension_name);
 
 ///////////////////////////////////////////
 

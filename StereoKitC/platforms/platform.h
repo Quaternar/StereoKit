@@ -67,6 +67,8 @@ void platform_step_end  ();
 
 ///////////////////////////////////////////
 
+void   platform_vulkan_ext_request(const char *extension_name);
+
 void   platform_msgbox_err        (const char *text, const char *header);
 void   platform_print_callstack   ();
 font_t platform_default_font      ();

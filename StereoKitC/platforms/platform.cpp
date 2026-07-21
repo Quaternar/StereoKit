@@ -54,8 +54,113 @@ using namespace sk;
 struct platform_state_t {
 	app_mode_ mode;
 	bool32_t  force_fallback_keyboard;
+	array_t<const char*> merged_device_extensions;
 };
 static platform_state_t* local = {};
+static array_t<char*> requested_vulkan_device_extensions = {};
+
+struct platform_device_init_context_t {
+	skr_device_init_callback_t callback;
+	void*                      user_data;
+};
+
+struct platform_device_create_context_t {
+	skr_device_create_callback_t callback;
+	void*                        user_data;
+};
+
+static bool extension_list_contains(const array_t<const char*> &extensions, const char *extension_name) {
+	for (int32_t i = 0; i < extensions.count; i++) {
+		if (strcmp(extensions[i], extension_name) == 0)
+			return true;
+	}
+	return false;
+}
+
+static bool device_create_info_has_extension(const VkDeviceCreateInfo* create_info, const char *extension_name) {
+	for (uint32_t i = 0; i < create_info->enabledExtensionCount; i++) {
+		if (strcmp(create_info->ppEnabledExtensionNames[i], extension_name) == 0)
+			return true;
+	}
+	return false;
+}
+
+static void extension_list_add_unique(array_t<const char*> &extensions, const char *extension_name) {
+	if (!extension_list_contains(extensions, extension_name))
+		extensions.add(extension_name);
+}
+
+static skr_device_request_t platform_device_init_callback(void* vk_instance, void* user_data) {
+	platform_device_init_context_t* context = (platform_device_init_context_t*)user_data;
+	skr_device_request_t request = {};
+	if (context != nullptr && context->callback != nullptr)
+		request = context->callback(vk_instance, context->user_data);
+
+	if (local == nullptr || requested_vulkan_device_extensions.count == 0)
+		return request;
+
+	local->merged_device_extensions.count = 0;
+	for (uint32_t i = 0; i < request.required_device_extension_count; i++)
+		extension_list_add_unique(local->merged_device_extensions, request.required_device_extensions[i]);
+	for (int32_t i = 0; i < requested_vulkan_device_extensions.count; i++)
+		extension_list_add_unique(local->merged_device_extensions, requested_vulkan_device_extensions[i]);
+
+	request.required_device_extensions      = local->merged_device_extensions.data;
+	request.required_device_extension_count = (uint32_t)local->merged_device_extensions.count;
+	return request;
+}
+
+static void* platform_device_create_callback(skr_device_create_info_t* create_info, void* user_data) {
+	platform_device_create_context_t* context = (platform_device_create_context_t*)user_data;
+	VkDeviceCreateInfo device_create_info = *(VkDeviceCreateInfo*)create_info->device_create_info;
+
+	VkPhysicalDeviceTimelineSemaphoreFeatures timeline_support = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+	};
+	VkPhysicalDeviceFeatures2 features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext = &timeline_support,
+	};
+	if (device_create_info_has_extension(&device_create_info, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)) {
+		vkGetPhysicalDeviceFeatures2((VkPhysicalDevice)create_info->vk_physical_device, &features);
+		if (timeline_support.timelineSemaphore) {
+			VkPhysicalDeviceTimelineSemaphoreFeatures timeline_features = {
+				.sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+				.pNext             = const_cast<void*>(device_create_info.pNext),
+				.timelineSemaphore = VK_TRUE,
+			};
+			device_create_info.pNext = &timeline_features;
+
+			skr_device_create_info_t wrapped_create_info = *create_info;
+			wrapped_create_info.device_create_info = &device_create_info;
+			if (context != nullptr && context->callback != nullptr)
+				return context->callback(&wrapped_create_info, context->user_data);
+
+			VkDevice device = VK_NULL_HANDLE;
+			if (vkCreateDevice(
+					(VkPhysicalDevice)create_info->vk_physical_device,
+					&device_create_info,
+					nullptr,
+					&device) != VK_SUCCESS)
+				return nullptr;
+			return device;
+		}
+
+		log_warn("VK_KHR_timeline_semaphore was requested, but the physical device does not support timelineSemaphore.");
+	}
+
+	if (context != nullptr && context->callback != nullptr)
+		return context->callback(create_info, context->user_data);
+
+	VkDevice device = VK_NULL_HANDLE;
+	if (vkCreateDevice(
+			(VkPhysicalDevice)create_info->vk_physical_device,
+			&device_create_info,
+			nullptr,
+			&device) != VK_SUCCESS)
+		return nullptr;
+	return device;
+}
 
 ///////////////////////////////////////////
 // Allocator wrappers for sk_app
@@ -83,6 +188,22 @@ namespace sk {
 const char* app_mode_str      (app_mode_ mode);
 bool        platform_set_mode (app_mode_ mode);
 void        platform_stop_mode();
+
+///////////////////////////////////////////
+
+void platform_vulkan_ext_request(const char *extension_name) {
+	if (sk_is_initialized()) {
+		log_err("backend_vulkan_ext_request must be called BEFORE StereoKit initialization!");
+		return;
+	}
+	if (extension_name == nullptr)
+		return;
+	for (int32_t i = 0; i < requested_vulkan_device_extensions.count; i++) {
+		if (strcmp(requested_vulkan_device_extensions[i], extension_name) == 0)
+			return;
+	}
+	requested_vulkan_device_extensions.add(string_copy(extension_name));
+}
 
 ///////////////////////////////////////////
 
@@ -163,6 +284,21 @@ bool platform_init() {
 	skr_settings.required_extensions      = vk_extensions.data;
 	skr_settings.required_extension_count = (uint32_t)vk_extensions.count;
 
+	platform_device_init_context_t device_init_context = {
+		skr_settings.device_init_callback,
+		skr_settings.device_init_user_data,
+	};
+	platform_device_create_context_t device_create_context = {
+		skr_settings.device_create_callback,
+		skr_settings.device_create_user_data,
+	};
+	if (requested_vulkan_device_extensions.count > 0) {
+		skr_settings.device_init_callback  = platform_device_init_callback;
+		skr_settings.device_init_user_data = &device_init_context;
+		skr_settings.device_create_callback  = platform_device_create_callback;
+		skr_settings.device_create_user_data = &device_create_context;
+	}
+
 	bool skr_result = skr_init(skr_settings);
 	vk_extensions.free();
 	if (!skr_result) {
@@ -209,6 +345,11 @@ void platform_shutdown() {
 	ska_shutdown();
 
 	device_data_free(&device_data);
+	if (local != nullptr)
+		local->merged_device_extensions.free();
+	for (int32_t i = 0; i < requested_vulkan_device_extensions.count; i++)
+		sk_free(requested_vulkan_device_extensions[i]);
+	requested_vulkan_device_extensions.free();
 	*local = {};
 	sk_free(local);
 }
