@@ -375,6 +375,10 @@ namespace StereoKit
 		/// diffuse color but it's been superseded - prefer Etc2 or Astc
 		/// on newer hardware!</summary>
 		Etc1Rgb,
+		/// <summary>ETC1 sRGB RGB, no alpha, 4 bpp. The sRGB counterpart to
+		/// Etc1Rgb - the GPU converts to linear on sample, so this is
+		/// the correct choice for color textures.</summary>
+		Etc1RgbSrgb,
 		/// <summary>ETC2 sRGB color with full alpha, 8 bpp. The standard
 		/// compressed RGBA format on OpenGL ES 3.0+ mobile devices, and
 		/// mandatory in the spec - so it's widely available. A great
@@ -423,6 +427,18 @@ namespace StereoKit
 		/// <summary>ASTC 4x4 linear color with full alpha, 8 bpp. High-quality
 		/// compressed format for data textures on modern mobile GPUs.</summary>
 		Astc4x4Rgba,
+		/// <summary>ASTC 6x6 sRGB color with full alpha, ~3.56 bpp. Larger blocks
+		/// than Astc4x4 for less than half the memory, at some cost to
+		/// quality - a good trade for large or low-frequency textures.</summary>
+		Astc6x6RgbaSrgb,
+		/// <summary>ASTC 6x6 linear color with full alpha, ~3.56 bpp. The linear
+		/// counterpart to Astc6x6RgbaSrgb, for data textures.</summary>
+		Astc6x6Rgba,
+		/// <summary>ASTC 8x8 HDR color with full alpha, 2 bpp. Compressed HDR on
+		/// mobile GPUs, and much cheaper than an uncompressed float
+		/// format. Requires the ASTC HDR extension, which is separate
+		/// from baseline ASTC support!</summary>
+		Astc8x8RgbaHdr,
 		/// <summary>ATC RGB on Qualcomm Adreno GPUs, 4 bpp. Historical
 		/// Qualcomm-specific format - prefer Astc or Etc2 on newer
 		/// Adreno hardware.</summary>
@@ -1348,6 +1364,87 @@ namespace StereoKit
 		Ignore,
 	}
 
+	/// <summary>Option flags for playing a sound, see sound_play_t.</summary>
+	[Flags]
+	public enum SoundFlags {
+		/// <summary>No special behavior, the default.</summary>
+		None         = 0,
+		/// <summary>The sound restarts from the beginning when it reaches the end of its
+		/// data, and plays until stopped. Live streams ignore this, they already
+		/// wait for data forever.</summary>
+		Loop         = 1 << 0,
+		/// <summary>Skip spatialization entirely: no distance attenuation, panning, or
+		/// filtering. The sound follows the head, good for music, UI, or
+		/// pre-rendered binaural content.</summary>
+		HeadLocked   = 1 << 1,
+		/// <summary>Delay the sound's onset by its distance from the listener divided by
+		/// the speed of sound (343m/s), computed once when playback starts. Great
+		/// for thunder, explosions, and other far away events.</summary>
+		PropagationDelay = 1 << 2,
+	}
+
+	/// <summary>A category a playing sound belongs to. Each bus is just a volume control
+	/// that affects every sound tagged with it, handy for separate sfx/music/ui
+	/// volume sliders, or ducking categories wholesale.</summary>
+	public enum SoundBus {
+		/// <summary>General sound effects, the default bus.</summary>
+		Sfx          = 0,
+		/// <summary>Background music and ambience.</summary>
+		Music,
+		/// <summary>Interface feedback sounds. StereoKit's own UI sounds use this bus.</summary>
+		Ui,
+		/// <summary>Dialogue, voice-over, and voice comms.</summary>
+		Voice,
+	}
+
+	/// <summary>The channel format of a Sound's data. Only mono sounds spatialize -
+	/// playing a non-mono sound ignores its position entirely.</summary>
+	public enum SoundChannels {
+		/// <summary>One channel. Spatializes as a point or shaped source, the default
+		/// and by far the most common format for game audio.</summary>
+		Mono         = 0,
+		/// <summary>Two interleaved channels, played back head-locked and untouched.
+		/// Music, and pre-rendered binaural content.</summary>
+		Stereo,
+		/// <summary>Four interleaved first order (1) ambisonic channels in the ambiX
+		/// convention (ACN order W,Y,Z,X with SN3D normalization). The sound
+		/// field stays world-fixed, counter-rotating against the head - the
+		/// head-tracked generalization of a binaural render. Great for
+		/// recorded or simulated environmental beds.</summary>
+		Ambisonic1,
+	}
+
+	/// <summary>Common audio sample rates, in Hz, for sound streams and microphone capture.
+	/// The enum value _is_ the rate in Hz, so you can cast any integer rate to this
+	/// type - these are just the well-supported ones, tagged with where each is
+	/// typically used. StereoKit mixes everything at 48kHz and resamples to and from
+	/// other rates as needed, so any positive rate works, but a rate a device
+	/// captures or plays natively avoids an extra resample.</summary>
+	public enum SoundSampleRate {
+		/// <summary>Use StereoKit's native mix rate, 48kHz. No resampling in the mixer, and
+		/// the best default unless you have a specific reason otherwise.</summary>
+		Default      = 0,
+		/// <summary>8kHz narrowband telephony, classic Bluetooth headset (HFP/SCO) quality.
+		/// Tiny data rate, intelligible speech only.</summary>
+		Telephony    = 8000,
+		/// <summary>16kHz wideband speech - the rate that speech-to-text, wake-word, and
+		/// VoIP pipelines typically expect. A good low-bandwidth choice for voice.</summary>
+		Speech       = 16000,
+		/// <summary>32kHz, seen in some broadcast audio and Bluetooth wideband (mSBC).</summary>
+		Broadcast    = 32000,
+		/// <summary>44.1kHz, the CD-audio standard and a common consumer device default.</summary>
+		Cd           = 44100,
+		/// <summary>48kHz, the AV/pro standard and StereoKit's native mix rate. The modern
+		/// default for most capture hardware.</summary>
+		Standard     = 48000,
+		/// <summary>96kHz high-resolution pro audio. Rare for a microphone, and resampled
+		/// down to 48kHz for mixing anyway.</summary>
+		Studio       = 96000,
+		/// <summary>192kHz, the extreme end of pro audio interfaces. Almost never a real
+		/// microphone rate, and heavily oversampled for StereoKit's purposes.</summary>
+		Ultra        = 192000,
+	}
+
 	/// <summary>When opening the Platform.FilePicker, this enum describes
 	/// how the picker should look and behave.</summary>
 	public enum PickerMode {
@@ -1844,6 +1941,36 @@ namespace StereoKit
 		Divide       = 0x6F,
 		/// <summary>Maximum value for key codes.</summary>
 		MAX          = 0xFF,
+	}
+
+	/// <summary>Describes what kind of keyboard input event this is.</summary>
+	public enum KeyboardEventType {
+		/// <summary>Not an event. Consuming returns this once no events remain in this
+		/// frame's queue, and reading by index returns it for an index outside the
+		/// queue.</summary>
+		None         = 0,
+		/// <summary>A key was pressed. Auto-repeats arrive as additional press events with no
+		/// release between them, one per repeat.</summary>
+		KeyPress,
+		/// <summary>A key was released.</summary>
+		KeyRelease,
+		/// <summary>A single codepoint of insertable text.</summary>
+		Text,
+	}
+
+	/// <summary>A bit flag describing which of the keyboard's modifier keys are held.</summary>
+	[Flags]
+	public enum KeyMod {
+		/// <summary>No modifier keys are held.</summary>
+		None         = 0,
+		/// <summary>Either shift key.</summary>
+		Shift        = 1 << 0,
+		/// <summary>Either ctrl key.</summary>
+		Ctrl         = 1 << 1,
+		/// <summary>Either alt key.</summary>
+		Alt          = 1 << 2,
+		/// <summary>Either Windows/Mac Command key.</summary>
+		Cmd          = 1 << 3,
 	}
 
 	/// <summary>Represents an input from an XR headset's controller!</summary>

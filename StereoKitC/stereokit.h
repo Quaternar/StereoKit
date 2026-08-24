@@ -502,6 +502,10 @@ typedef enum tex_format_ {
 	  diffuse color but it's been superseded - prefer Etc2 or Astc
 	  on newer hardware!*/
 	tex_format_etc1_rgb,
+	/*ETC1 sRGB RGB, no alpha, 4 bpp. The sRGB counterpart to
+	  Etc1Rgb - the GPU converts to linear on sample, so this is
+	  the correct choice for color textures.*/
+	tex_format_etc1_rgb_srgb,
 	/*ETC2 sRGB color with full alpha, 8 bpp. The standard
 	  compressed RGBA format on OpenGL ES 3.0+ mobile devices, and
 	  mandatory in the spec - so it's widely available. A great
@@ -550,6 +554,18 @@ typedef enum tex_format_ {
 	/*ASTC 4x4 linear color with full alpha, 8 bpp. High-quality
 	  compressed format for data textures on modern mobile GPUs.*/
 	tex_format_astc4x4_rgba,
+	/*ASTC 6x6 sRGB color with full alpha, ~3.56 bpp. Larger blocks
+	  than Astc4x4 for less than half the memory, at some cost to
+	  quality - a good trade for large or low-frequency textures.*/
+	tex_format_astc6x6_rgba_srgb,
+	/*ASTC 6x6 linear color with full alpha, ~3.56 bpp. The linear
+	  counterpart to Astc6x6RgbaSrgb, for data textures.*/
+	tex_format_astc6x6_rgba,
+	/*ASTC 8x8 HDR color with full alpha, 2 bpp. Compressed HDR on
+	  mobile GPUs, and much cheaper than an uncompressed float
+	  format. Requires the ASTC HDR extension, which is separate
+	  from baseline ASTC support!*/
+	tex_format_astc8x8_rgba_hdr,
 	/*ATC RGB on Qualcomm Adreno GPUs, 4 bpp. Historical
 	  Qualcomm-specific format - prefer Astc or Etc2 on newer
 	  Adreno hardware.*/
@@ -823,6 +839,7 @@ typedef struct sk_settings_t {
 	int32_t        flatscreen_pos_y;
 	int32_t        flatscreen_width;
 	int32_t        flatscreen_height;
+	bool32_t       fullscreen;
 	bool32_t       disable_desktop_input_window;
 	bool32_t       disable_unfocused_sleep;
 	float          render_scaling;
@@ -904,6 +921,15 @@ SK_API const char   *sk_version_name       (void);
 SK_API uint64_t      sk_version_id         (void);
 SK_API app_focus_    sk_app_focus          (void);
 SK_API quit_reason_  sk_get_quit_reason    (void);
+
+///////////////////////////////////////////
+
+SK_DeclarePrivateType(window_t);
+
+SK_API window_t      window_get_main          (void);
+SK_API bool32_t      window_get_fullscreen    (const window_t window);
+SK_API void          window_request_fullscreen(window_t window, bool32_t fullscreen);
+SK_API void          window_get_size          (const window_t window, int32_t* out_width_px, int32_t* out_height_px);
 
 ///////////////////////////////////////////
 
@@ -2446,13 +2472,134 @@ typedef struct sound_inst_t {
 	int16_t  _slot;
 } sound_inst_t;
 
+/*Option flags for playing a sound, see sound_play_t.*/
+typedef enum sound_flags_ {
+	/*No special behavior, the default.*/
+	sound_flags_none              = 0,
+	/*The sound restarts from the beginning when it reaches the end of its
+	  data, and plays until stopped. Live streams ignore this, they already
+	  wait for data forever.*/
+	sound_flags_loop              = 1 << 0,
+	/*Skip spatialization entirely: no distance attenuation, panning, or
+	  filtering. The sound follows the head, good for music, UI, or
+	  pre-rendered binaural content.*/
+	sound_flags_head_locked       = 1 << 1,
+	/*Delay the sound's onset by its distance from the listener divided by
+	  the speed of sound (343m/s), computed once when playback starts. Great
+	  for thunder, explosions, and other far away events.*/
+	sound_flags_propagation_delay = 1 << 2,
+} sound_flags_;
+SK_MakeFlag(sound_flags_);
+
+/*A category a playing sound belongs to. Each bus is just a volume control
+  that affects every sound tagged with it, handy for separate sfx/music/ui
+  volume sliders, or ducking categories wholesale.*/
+typedef enum sound_bus_ {
+	/*General sound effects, the default bus.*/
+	sound_bus_sfx = 0,
+	/*Background music and ambience.*/
+	sound_bus_music,
+	/*Interface feedback sounds. StereoKit's own UI sounds use this bus.*/
+	sound_bus_ui,
+	/*Dialogue, voice-over, and voice comms.*/
+	sound_bus_voice,
+} sound_bus_;
+
+/*The channel format of a Sound's data. Only mono sounds spatialize -
+  playing a non-mono sound ignores its position entirely.*/
+typedef enum sound_channels_ {
+	/*One channel. Spatializes as a point or shaped source, the default
+	  and by far the most common format for game audio.*/
+	sound_channels_mono = 0,
+	/*Two interleaved channels, played back head-locked and untouched.
+	  Music, and pre-rendered binaural content.*/
+	sound_channels_stereo,
+	/*Four interleaved first order (1) ambisonic channels in the ambiX
+	  convention (ACN order W,Y,Z,X with SN3D normalization). The sound
+	  field stays world-fixed, counter-rotating against the head - the
+	  head-tracked generalization of a binaural render. Great for
+	  recorded or simulated environmental beds.*/
+	sound_channels_ambisonic1,
+} sound_channels_;
+
+/*Optional settings for sound_play. A zero initialized struct is a valid
+  default state: fields where zero must mean "default" treat it that way
+  explicitly, so volume 0 plays at full trim, and pitch 0 plays at normal
+  speed.*/
+typedef struct sound_play_t {
+	/*A 0-1 volume trim on top of the sound's decibel loudness. 0 is treated
+	  as the default full trim of 1. For real silence, use a tiny value.
+	  Values above 1 amplify, negatives clamp to 0.*/
+	float        volume;
+	/*Playback rate multiplier, clamped to 0.25-4. 1 is normal speed, 2 is
+	  twice as fast and an octave up. 0 is treated as 1.*/
+	float        pitch;
+	/*Apparent size of the source, 0-1. 0 is a point in space, 1 fills the
+	  whole sound field evenly. Great for wind, rivers, and rumble - but
+	  keep transients like impacts at 0, width smears their attack.*/
+	float        spread;
+	/*Seconds before the sound actually starts playing, sample accurate.
+	  sound_flags_propagation_delay adds distance/343m/s on top of this.*/
+	float        delay;
+	/*Low-pass filter cutoff override in Hz for this voice. 0 uses the
+	  automatic distance/direction model.*/
+	float        cutoff;
+	/*The volume category this sound belongs to, sound_bus_sfx when zeroed.*/
+	sound_bus_   bus;
+	/*See sound_flags_.*/
+	sound_flags_ flags;
+	/*Optional emitter shape: 1 point is a sphere, 2+ a rounded polyline.
+	  The emitter follows the listener along the shape - position becomes
+	  the closest point, and apparent size grows as the shape fills more of
+	  the view, going fully diffuse inside it. Points are copied at play,
+	  max 32. Null means a point source at the play position.*/
+	const vec3*  shape_points;
+	int32_t      shape_point_count;
+	/*Radius of the shape's sphere or polyline tube, in meters.*/
+	float        shape_radius;
+} sound_play_t;
+
+/*Common audio sample rates, in Hz, for sound streams and microphone capture.
+  The enum value _is_ the rate in Hz, so you can cast any integer rate to this
+  type - these are just the well-supported ones, tagged with where each is
+  typically used. StereoKit mixes everything at 48kHz and resamples to and from
+  other rates as needed, so any positive rate works, but a rate a device
+  captures or plays natively avoids an extra resample.*/
+typedef enum sound_sample_rate_ {
+	/*Use StereoKit's native mix rate, 48kHz. No resampling in the mixer, and
+	  the best default unless you have a specific reason otherwise.*/
+	sound_sample_rate_default   = 0,
+	/*8kHz narrowband telephony, classic Bluetooth headset (HFP/SCO) quality.
+	  Tiny data rate, intelligible speech only.*/
+	sound_sample_rate_telephony = 8000,
+	/*16kHz wideband speech - the rate that speech-to-text, wake-word, and
+	  VoIP pipelines typically expect. A good low-bandwidth choice for voice.*/
+	sound_sample_rate_speech    = 16000,
+	/*32kHz, seen in some broadcast audio and Bluetooth wideband (mSBC).*/
+	sound_sample_rate_broadcast = 32000,
+	/*44.1kHz, the CD-audio standard and a common consumer device default.*/
+	sound_sample_rate_cd        = 44100,
+	/*48kHz, the AV/pro standard and StereoKit's native mix rate. The modern
+	  default for most capture hardware.*/
+	sound_sample_rate_standard  = 48000,
+	/*96kHz high-resolution pro audio. Rare for a microphone, and resampled
+	  down to 48kHz for mixing anyway.*/
+	sound_sample_rate_studio    = 96000,
+	/*192kHz, the extreme end of pro audio interfaces. Almost never a real
+	  microphone rate, and heavily oversampled for StereoKit's purposes.*/
+	sound_sample_rate_ultra     = 192000,
+} sound_sample_rate_;
+
 SK_API sound_t      sound_find           (const char *id);
 SK_API void         sound_set_id         (sound_t sound, const char *id);
 SK_API const char*  sound_get_id         (const sound_t sound);
 SK_API sound_t      sound_create         (const char *filename_utf8);
-SK_API sound_t      sound_create_stream  (float buffer_duration);
-SK_API sound_t      sound_create_samples (const float *in_arr_samples_at_48000s, uint64_t sample_count);
-SK_API sound_t      sound_generate       (float (*audio_generator)(float sample_time), float duration);
+SK_API sound_t      sound_create_mem     (const char *id, const void *in_arr_data, size_t data_size);
+SK_API sound_t      sound_create_stream  (float buffer_duration, sound_channels_ channels sk_default(sound_channels_mono), sound_sample_rate_ sample_rate sk_default(sound_sample_rate_default));
+SK_API sound_t      sound_create_samples (const float *in_arr_samples_at_48000s, uint64_t sample_count, sound_channels_ channels sk_default(sound_channels_mono));
+SK_API sound_channels_ sound_get_channels(sound_t sound);
+SK_API asset_state_ sound_asset_state    (const sound_t sound);
+SK_API sound_t      sound_generate       (void (*audio_generator)(float *out_arr_samples, uint64_t frame_start, uint64_t frame_count), float duration, sound_channels_ channels sk_default(sound_channels_mono));
 SK_API void         sound_write_samples  (sound_t sound, const float *in_arr_samples,  uint64_t sample_count);
 SK_API uint64_t     sound_read_samples   (sound_t sound, float       *out_arr_samples, uint64_t sample_count);
 SK_API uint64_t     sound_unread_samples (sound_t sound);
@@ -2460,7 +2607,7 @@ SK_API uint64_t     sound_total_samples  (sound_t sound);
 SK_API uint64_t     sound_cursor_samples (sound_t sound);
 SK_API float        sound_get_decibels   (sound_t sound);
 SK_API void         sound_set_decibels   (sound_t sound, float decibels);
-SK_API sound_inst_t sound_play           (sound_t sound, vec3 at, float volume);
+SK_API sound_inst_t sound_play           (sound_t sound, vec3 at, const sound_play_t *opt_settings sk_default(nullptr));
 SK_API float        sound_duration       (sound_t sound);
 SK_API void         sound_addref         (sound_t sound);
 SK_API void         sound_release        (sound_t sound);
@@ -2469,15 +2616,66 @@ SK_API void         sound_inst_stop         (sound_inst_t sound_inst);
 SK_API bool32_t     sound_inst_is_playing   (sound_inst_t sound_inst);
 SK_API void         sound_inst_set_pos      (sound_inst_t sound_inst, vec3 pos);
 SK_API vec3         sound_inst_get_pos      (sound_inst_t sound_inst);
-SK_API void         sound_inst_set_volume   (sound_inst_t sound_inst, float volume);
+SK_API void         sound_inst_set_volume   (sound_inst_t sound_inst, float volume_pct);
 SK_API float        sound_inst_get_volume   (sound_inst_t sound_inst);
+SK_API void         sound_inst_set_pitch    (sound_inst_t sound_inst, float pitch_mult);
+SK_API float        sound_inst_get_pitch    (sound_inst_t sound_inst);
+SK_API void         sound_inst_set_spread   (sound_inst_t sound_inst, float spread_pct);
+SK_API float        sound_inst_get_spread   (sound_inst_t sound_inst);
+SK_API void         sound_inst_set_cutoff   (sound_inst_t sound_inst, float cutoff_hz);
+SK_API void         sound_inst_set_paused   (sound_inst_t sound_inst, bool32_t paused);
+SK_API bool32_t     sound_inst_get_paused   (sound_inst_t sound_inst);
+SK_API void         sound_inst_seek         (sound_inst_t sound_inst, uint64_t sample);
+SK_API uint64_t     sound_inst_get_cursor   (sound_inst_t sound_inst);
+SK_API void         sound_inst_set_shape    (sound_inst_t sound_inst, const vec3 *in_arr_points, int32_t point_count, float radius);
 SK_API float        sound_inst_get_intensity(sound_inst_t sound_inst);
+
+/*A perceptual description of the acoustic space sounds play in - an
+  environment rather than a literal room, so it covers halls through
+  forests. Spatial sounds feed a shared reverb whose level stays constant
+  with distance, so the direct-to-reverb balance naturally carries how far
+  away a sound is. A wet of 0 disables the system entirely at zero cost,
+  and a zeroed struct is the off state. Language bindings provide preset
+  values for common spaces as starting points.*/
+typedef struct audio_env_t {
+	/*Reverb level, 0-1. 0 turns environmental acoustics off completely,
+	  and is the default.*/
+	float wet;
+	/*Decay time in seconds - how long the tail takes to fall 60dB at mid
+	  frequencies. Rooms are ~0.4s, cathedrals a few seconds. Clamped to
+	  0.05-10.*/
+	float decay;
+	/*0-1, extra high frequency decay. Soft or leafy spaces are high,
+	  tiled rooms are low.*/
+	float damp;
+	/*Size of the space in meters, clamped to 2-40. Drives the spacing of
+	  the echoes that build the tail. Changing this restarts the tail,
+	  where the other fields all glide smoothly.*/
+	float size;
+	/*0-1, how quickly discrete echoes blur into a dense wash. Scattered
+	  spaces like forests are high, bare rooms lower.*/
+	float scatter;
+	/*0-1, level of the distinct early reflections off the space's
+	  surfaces - the first bounces that glue a sound to the room. The
+	  ground bounce keeps a minimum presence; walls and ceiling scale
+	  fully with this, so outdoor spaces sit near 0.*/
+	float reflect;
+} audio_env_t;
+
+SK_API void         audio_set_volume        (float volume);
+SK_API float        audio_get_volume        (void);
+SK_API void         audio_set_bus_volume    (sound_bus_ bus, float volume);
+SK_API float        audio_get_bus_volume    (sound_bus_ bus);
+SK_API void         audio_set_listener      (const pose_t *opt_pose);
+SK_API float        audio_get_output_decibels(void);
+SK_API void         audio_set_env           (audio_env_t environment);
+SK_API audio_env_t  audio_get_env           (void);
 
 ///////////////////////////////////////////
 
 SK_API int32_t      mic_device_count     (void);
 SK_API const char*  mic_device_name      (int32_t index);
-SK_API bool32_t     mic_start            (const char *device_name sk_default(nullptr));
+SK_API bool32_t     mic_start            (const char *device_name sk_default(nullptr), sound_sample_rate_ sample_rate sk_default(sound_sample_rate_default));
 SK_API void         mic_stop             (void);
 SK_API sound_t      mic_get_stream       (void);
 SK_API bool32_t     mic_is_recording     (void);
@@ -2868,11 +3066,10 @@ typedef struct mouse_t {
 	/*Position of the mouse relative to the window it's in! This is the number
 	of pixels from the top left corner of the screen.*/
 	vec2          pos;
-	/*How much has the mouse moved during this frame? Measured in pixels. This
-	is all motion since the last frame, which is not always the same as the
-	difference between this frame's position and the last frame's! In relative
-	mouse mode, the position doesn't move at all, and this is the only place
-	mouse motion shows up.*/
+	/*How much has the mouse moved during this frame? This is normally just the
+	change in `pos`, measured in pixels. In relative mouse mode `pos` is frozen
+	and this becomes the only source of motion, in the mouse's raw device units
+	rather than pixels.*/
 	vec2          pos_change;
 	/*What's the current scroll value for the mouse's scroll wheel?*/
 	float         scroll;
@@ -3116,6 +3313,52 @@ typedef enum key_ {
 	/*Maximum value for key codes.*/
 	key_MAX = 0xFF,
 } key_;
+
+/*Describes what kind of keyboard input event this is.*/
+typedef enum keyboard_event_type_ {
+	/*Not an event. Consuming returns this once no events remain in this
+	  frame's queue, and reading by index returns it for an index outside the
+	  queue.*/
+	keyboard_event_type_none = 0,
+	/*A key was pressed. Auto-repeats arrive as additional press events with no
+	  release between them, one per repeat.*/
+	keyboard_event_type_key_press,
+	/*A key was released.*/
+	keyboard_event_type_key_release,
+	/*A single codepoint of insertable text.*/
+	keyboard_event_type_text,
+} keyboard_event_type_;
+
+/*A bit flag describing which of the keyboard's modifier keys are held.*/
+typedef enum key_mod_ {
+	/*No modifier keys are held.*/
+	key_mod_none = 0,
+	/*Either shift key.*/
+	key_mod_shift = 1 << 0,
+	/*Either ctrl key.*/
+	key_mod_ctrl = 1 << 1,
+	/*Either alt key.*/
+	key_mod_alt = 1 << 2,
+	/*Either Windows/Mac Command key.*/
+	key_mod_cmd = 1 << 3,
+} key_mod_;
+SK_MakeFlag(key_mod_);
+
+/*A single keyboard input event, either a key press, a key release, or one
+  codepoint of insertable text. Events preserve the exact order they were
+  produced in, including how text and keys interleave.*/
+typedef struct keyboard_event_t {
+	/*What kind of event this is, and which of the fields below apply.*/
+	keyboard_event_type_ type;
+	/*The key for press and release events, and none for text events. Mouse
+	  buttons arrive here too, as the mouse key values.*/
+	key_                 key;
+	/*The modifier keys held when this event was produced. A modifier's own
+	  press event includes itself, its release event does not.*/
+	key_mod_             modifiers;
+	/*The UTF-32 codepoint for text events, 0 for key events.*/
+	char32_t             character;
+} keyboard_event_t;
 
 /*Represents an input from an XR headset's controller!*/
 typedef enum controller_key_ {
@@ -3369,9 +3612,10 @@ SK_API void                  input_mouse_mode_set            (mouse_mode_ mode);
 SK_API mouse_mode_           input_mouse_mode_get            (void);
 SK_API void                  input_key_inject_press          (key_ key);
 SK_API void                  input_key_inject_release        (key_ key);
-SK_API char32_t              input_text_consume              (void);
-SK_API void                  input_text_reset                (void);
-SK_API void                  input_text_inject_char          (char32_t character);
+SK_API keyboard_event_t      input_keyboard_consume          (void);
+SK_API int32_t               input_keyboard_event_count      (void);
+SK_API keyboard_event_t      input_keyboard_event_at         (int32_t index);
+SK_API void                  input_text_inject               (const char* text_utf8);
 SK_API void                  input_hand_visible              (handed_ hand, bool32_t visible);
 SK_API bool32_t              input_hand_get_visible          (handed_ hand);
 SK_API void                  input_hand_material             (handed_ hand, material_t material);
@@ -3396,6 +3640,9 @@ SK_API hand_sim_id_t         input_hand_sim_pose_add         (const pose_t* in_a
 SK_API void                  input_hand_sim_pose_remove      (hand_sim_id_t id);
 SK_API void                  input_hand_sim_pose_clear       (void);
 
+SK_API SK_DEPRECATED char32_t input_text_consume             (void);
+SK_API SK_DEPRECATED void    input_text_reset                (void);
+SK_API SK_DEPRECATED void    input_text_inject_char          (char32_t character);
 SK_API SK_DEPRECATED int32_t input_pointer_count             (input_source_ filter sk_default(input_source_any));
 SK_API SK_DEPRECATED pointer_t input_pointer                 (int32_t index, input_source_ filter sk_default(input_source_any));
 SK_API SK_DEPRECATED void    input_subscribe                 (input_source_ source, button_state_ input_event, void (*input_event_callback)(input_source_ source, button_state_ input_event, const sk_ref(pointer_t) in_pointer));

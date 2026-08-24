@@ -649,6 +649,29 @@ float render_get_scaling() {
 
 ///////////////////////////////////////////
 
+// Applies the render scaling setting to a surface size. The setting itself
+// stays untouched, so a capped caller doesn't affect XR runs of the same app.
+void render_scaled_size(int32_t width, int32_t height, float max_scale, int32_t* out_width, int32_t* out_height) {
+	float scale = fminf(max_scale, render_get_scaling());
+
+	// An unscaled surface renders straight into the swapchain image, or
+	// resolves into it, and both of those need the sizes to match exactly.
+	if (scale == 1) {
+		*out_width  = width;
+		*out_height = height;
+		return;
+	}
+
+	// Scaled surfaces resolve into an intermediate of their own size instead,
+	// so they're free to round. Even dimensions keep MSAA resolves happy.
+	int32_t w = (int32_t)(width  * scale) & ~1;
+	int32_t h = (int32_t)(height * scale) & ~1;
+	*out_width  = w < 2 ? 2 : w;
+	*out_height = h < 2 ? 2 : h;
+}
+
+///////////////////////////////////////////
+
 void render_set_viewport_scaling(float viewport_rect_scale) {
 	local.viewport_scale = fmaxf(0,fminf(1,viewport_rect_scale));
 }
@@ -1053,7 +1076,10 @@ void render_check_screenshots() {
 		// Create render targets for screenshot
 		// Depth matches the display's preferred (stencil-free) format, so
 		// depth-reading post-process effects work in screenshots too.
-		tex_t color_surface = tex_create_rendertarget(w, h, 8, local.screenshot_list[i].tex_format, tex_format_none);
+		// The MSAA surface only ever feeds resolve_tex, so it's transient. The
+		// readback below reads the resolve, never this.
+		tex_t color_surface = tex_create(tex_type_image_nomips | tex_type_rendertarget | tex_type_transient_internal, local.screenshot_list[i].tex_format);
+		tex_set_color_arr(color_surface, w, h, nullptr, 1, 8, nullptr);
 		tex_t depth_surface = tex_create_rendertarget(w, h, 8, tex_get_supported_depth_format(render_preferred_depth_fmt(), true, 8), tex_format_none);
 		tex_t resolve_tex   = tex_create_rendertarget(w, h, 1, local.screenshot_list[i].tex_format, tex_format_none);
 
@@ -1075,8 +1101,9 @@ void render_check_screenshots() {
 
 		// Determine clear flags
 		render_clear_ clear      = render_clear_resolve(local.screenshot_list[i].clear);
-		skr_clear_    clear_flags = skr_clear_none;
-		if (clear & render_clear_color) clear_flags = (skr_clear_)(clear_flags | skr_clear_color);
+		// The color surface is brand new every shot, so skipping the clear has
+		// nothing to preserve. Discard, or we'd load undefined contents.
+		skr_clear_    clear_flags = (clear & render_clear_color) ? skr_clear_color : skr_clear_color_discard;
 		if (clear & render_clear_depth) clear_flags = (skr_clear_)(clear_flags | skr_clear_depth | skr_clear_stencil);
 
 		// Render!
@@ -1227,11 +1254,19 @@ void render_save_to_file(void* data, tex_format_ format, int width, int height, 
 	// come out with R/B swapped, and wider/other formats aren't 4x8-bit RGBA.
 	screenshot_ctx_t *ctx = (screenshot_ctx_t*)context;
 	if (format == tex_format_rgba32 || format == tex_format_rgba32_linear) {
+		// `data` is mapped GPU memory that's only valid for this call, and on
+		// most drivers it's uncached, where the encoders' non-linear reads are
+		// very slow. Our own copy solves both, and encodes ~10x faster.
+		size_t size   = (size_t)width * height * 4;
+		void*  pixels = sk_malloc(size);
+		memcpy(pixels, data, size);
+
 		if (string_endswith(ctx->filename, ".png", false)) {
-			stbi_write_png(ctx->filename, width, height, 4, data, 0);
+			stbi_write_png(ctx->filename, width, height, 4, pixels, 0);
 		} else {
-			stbi_write_jpg(ctx->filename, width, height, 4, data, ctx->quality);
+			stbi_write_jpg(ctx->filename, width, height, 4, pixels, ctx->quality);
 		}
+		sk_free(pixels);
 	} else {
 		log_errf("render screenshot to file requires an rgba32 format, got format %d", format);
 	}
