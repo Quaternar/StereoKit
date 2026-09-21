@@ -208,8 +208,10 @@ void interactor_show_ray(interactor_t interactor, float skip, bool hide_inactive
 	length = math_lerp(0.35f, length, visibility);
 	length = fmaxf(0, length - skip);
 
-	float alpha = 0.35f + active * 0.65f;
-	if (hide_inactive) alpha *= visibility;
+	// Quaternar: the ray is drawn at full opacity. The upstream 0.35 rest alpha leaves it a
+	// tint of whatever is behind it against a dark scene, which is most of a mixed scene.
+	// The curve below still tapers the ray, so only the overall dimming is gone.
+	float alpha = 1.0f;
 
 	const int32_t ct = 20;
 	const float   ray_snap = 1.0f; // 0.2f
