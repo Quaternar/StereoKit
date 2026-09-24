@@ -11,6 +11,7 @@
 
 #include "../device.h"
 #include "../_stereokit.h"
+#include "../qar_vulkan.h"
 #include "../sk_memory.h"
 #include "../systems/vert_format.h"
 #include "../systems/render.h"
@@ -163,6 +164,10 @@ bool platform_init() {
 
 	skr_settings.required_extensions      = vk_extensions.data;
 	skr_settings.required_extension_count = (uint32_t)vk_extensions.count;
+
+	// Quaternar: hand sk_renderer the GPU the streaming session already picked,
+	// when the app asked for one and no XR runtime is choosing it.
+	qar_vulkan_apply_device_picker(&skr_settings);
 
 	bool skr_result = skr_init(skr_settings);
 	vk_extensions.free();

@@ -323,6 +323,8 @@ target_sources(StereoKitC PRIVATE
   StereoKitC/hierarchy.cpp
   StereoKitC/log.h
   StereoKitC/log.cpp
+  StereoKitC/qar_vulkan.h
+  StereoKitC/qar_vulkan.cpp
   StereoKitC/rect_atlas.h
   StereoKitC/rect_atlas.cpp
   StereoKitC/sk_math.h
